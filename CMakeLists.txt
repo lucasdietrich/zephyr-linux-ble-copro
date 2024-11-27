@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.13.1)
+
+set(BOARD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/.)
+
+if(NOT DEFINED BOARD)
+    set(BOARD "nrf52840dk/nrf52840")
+endif()
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(zephyr-linux-ble-copro)
+
+set(app_sources
+    src/main.c
+)
+
+target_sources(app PRIVATE ${app_sources})

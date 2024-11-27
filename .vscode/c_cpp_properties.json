@@ -1,0 +1,22 @@
+{
+    "env": {
+        "zephyrDirectory": "../zephyr",
+        "modulesDirectory": "../modules",
+        "buildDirectory": "${workspaceFolder}/build"
+    },
+    "configurations": [
+        {
+            "name": "cmake build commands ARM",
+            "compileCommands": "${workspaceRoot}/build/compile_commands.json",
+            "intelliSenseMode": "gcc-arm",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}"
+                ]
+            },
+            "cStandard": "c99",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
