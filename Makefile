@@ -11,6 +11,9 @@ flash:
 debug:
 	west debugserver
 
+menuconfig:
+	west build -t menuconfig
+
 flash_sn:
 	west -v flash -r nrfjprog --snr $(SN)
 

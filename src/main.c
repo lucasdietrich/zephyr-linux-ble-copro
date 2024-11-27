@@ -1,19 +1,41 @@
+/*
+ * Copyright (c) 2024 Lucas Dietrich <ld.adecy@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/usb/usb_device.h>
 
-#include <observer.h>
+#include <ble_observer.h>
+#include <usb_net.h>
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_INF);
 
 int main(void)
 {
+	int ret;
+
 	printk("Hello, World!\n");
 
-	/* Initialize the Bluetooth Subsystem */
-	int ret = bt_enable(NULL);
+	/* Initialize NET interface management */
+	usb_net_iface_init();
+
+	/* Initialize the USB Subsystem */
+	ret = usb_enable(NULL);
 	if (ret != 0) {
-		LOG_INF("Bluetooth init failed (ret %d)", ret);
+		LOG_ERR("Failed to enable USB");
+		return ret;
+	}
+
+	LOG_INF("USB initialized %d", 0);
+
+	/* Initialize the Bluetooth Subsystem */
+	ret = bt_enable(NULL);
+	if (ret != 0) {
+		LOG_ERR("Bluetooth init failed (ret %d)", ret);
 		return ret;
 	}
 

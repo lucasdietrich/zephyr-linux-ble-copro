@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Lucas Dietrich <ld.adecy@gmail.com>
+ * Copyright (c) 2024 Lucas Dietrich <ld.adecy@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#include <observer.h>
+#include <ble_observer.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/uuid.h>

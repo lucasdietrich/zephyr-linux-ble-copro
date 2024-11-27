@@ -1,0 +1,37 @@
+menuconfig COPRO_USB_NETWORK
+    bool "USB Network Configuration"
+    default y
+    depends on USB_DEVICE_NETWORK_ECM
+    help
+      This option allows you to configure the USB network settings.
+
+if COPRO_USB_NETWORK
+
+config COPRO_USB_ECM_IPV4_ADDR
+    string "IPv4 Address"
+    default "192.0.3.2"
+    depends on USB_DEVICE_NETWORK_ECM
+    help
+      The IPv4 address to assign to the USB Ethernet Control Model (ECM) interface.
+
+config COPRO_USB_ECM_IPV4_GW
+    string "IPv4 Gateway"
+    default "192.0.3.1"
+    depends on USB_DEVICE_NETWORK_ECM
+    help
+      The IPv4 gateway to assign to the USB Ethernet Control Model (ECM) interface.
+
+config COPRO_USB_ECM_IPV4_NETMASK
+    string "IPv4 Netmask"
+    default "255.255.255.0"
+    depends on USB_DEVICE_NETWORK_ECM
+    help
+      The IPv4 netmask to assign to the USB Ethernet Control Model (ECM) interface.
+
+endif
+
+menu "Zephyr RTOS Configuration"
+
+source "Kconfig.zephyr"
+
+endmenu

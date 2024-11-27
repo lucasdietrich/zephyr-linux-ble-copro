@@ -11,8 +11,10 @@ project(zephyr-linux-ble-copro)
 
 set(app_sources
     src/main.c
-    src/observer.c
+    src/ble_observer.c
 )
+
+target_sources_ifdef(CONFIG_COPRO_USB_NETWORK app PRIVATE src/usb_net.c)
 
 target_include_directories(app PRIVATE include)
 target_sources(app PRIVATE ${app_sources})
