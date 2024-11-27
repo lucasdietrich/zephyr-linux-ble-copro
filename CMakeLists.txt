@@ -11,6 +11,8 @@ project(zephyr-linux-ble-copro)
 
 set(app_sources
     src/main.c
+    src/observer.c
 )
 
+target_include_directories(app PRIVATE include)
 target_sources(app PRIVATE ${app_sources})

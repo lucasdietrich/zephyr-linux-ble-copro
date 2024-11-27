@@ -15,7 +15,7 @@ flash_sn:
 	west -v flash -r nrfjprog --snr $(SN)
 
 monitor:
-	python3 -m serial.tools.miniterm --eol LF /dev/ttyACM0 115200
+	python3 -m serial.tools.miniterm --eol LF --raw /dev/ttyACM0 115200
 
 clean:
 	rm -rf build
