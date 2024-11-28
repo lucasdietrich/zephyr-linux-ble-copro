@@ -11,6 +11,7 @@
 
 #include <ble_observer.h>
 #include <usb_net.h>
+#include <stream_client.h>
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_INF);
 
@@ -44,5 +45,8 @@ int main(void)
 	/* Start the BLE observer thread */
 	ble_observer_start();
 
+	/* Start the streamc client */
+	stream_client_init();
+	
 	return 0;
 }

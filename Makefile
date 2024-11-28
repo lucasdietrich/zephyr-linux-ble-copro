@@ -20,5 +20,9 @@ flash_sn:
 monitor:
 	python3 -m serial.tools.miniterm --eol LF --raw /dev/ttyACM0 115200
 
+format:
+	find src -iname *.c -o -iname *.h | xargs clang-format -i
+	find include -iname *.h | xargs clang-format -i
+
 clean:
 	rm -rf build

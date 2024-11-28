@@ -28,7 +28,67 @@ config COPRO_USB_ECM_IPV4_NETMASK
     help
       The IPv4 netmask to assign to the USB Ethernet Control Model (ECM) interface.
 
-endif
+endif # COPRO_USB_NETWORK
+
+menuconfig COPRO_XIAOMI_LYWSD03MMC
+    bool "Xiaomi LYWSD03MMC support"
+    default y
+    help
+      This option allows you to report the measurements from the Xiaomi LYWSD03MMC sensor.
+
+if COPRO_XIAOMI_LYWSD03MMC
+
+config COPRO_XIAOMI_QUEUE_SIZE
+    int "Queue Size"
+    default 20
+    help
+      The size of the queue to store the measurements from the Xiaomi LYWSD03MMC sensor.
+
+endif # COPRO_XIAOMI_LYWSD03MMC
+
+menuconfig COPRO_STREAM_CLIENT
+    bool "Coprocessor stream Client"
+    default y
+    help
+      This option allows you to configure the Stream Client settings.
+
+if COPRO_STREAM_CLIENT
+
+config COPRO_STREAM_PORT
+    int "Stream Port"
+    default 4000
+    help
+      The port number to use for the Stream Client.
+
+config COPRO_STREAM_HOST
+    string "Stream Host"
+    default "192.0.3.1"
+    help
+      The host to connect to for the Stream Client.
+
+config COPRO_STREAM_TRY_CONNECT_INTERVAL
+    int "Stream Try Connect Interval"
+    default 1000
+    help
+      The interval in milliseconds to try to connect to the Stream Client.
+
+endif # COPRO_STREAM_CLIENT
+
+menuconfig COPRO_CONFIG_SERVER
+    bool "Coprocessor configuration server"
+    default y
+    help
+      This option allows you to configure the Configuration Server settings.
+
+if COPRO_CONFIG_SERVER
+
+config COPRO_CONFIG_PORT
+    int "Configuration Port"
+    default 4001
+    help
+      The port number to use for the Configuration Server.
+
+endif # COPRO_CONFIG_SERVER
 
 menu "Zephyr RTOS Configuration"
 

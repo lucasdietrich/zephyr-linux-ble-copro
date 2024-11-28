@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <usb_net.h>
-
 #include <zephyr/logging/log.h>
 #include <zephyr/net/conn_mgr_monitor.h>
 #include <zephyr/net/ethernet_mgmt.h>
 #include <zephyr/net/net_context.h>
 #include <zephyr/net/net_core.h>
-#include <zephyr/net/net_if.h>
 #include <zephyr/net/net_event.h>
+#include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
+
+#include <usb_net.h>
 
 LOG_MODULE_REGISTER(usb_net_mgmt, LOG_LEVEL_INF);
 
@@ -100,12 +100,12 @@ static void show_ipv4(struct net_if *iface)
 		LOG_INF("=== NET interface %p ===", iface);
 
 		LOG_INF("Address: %s [addr type %s]",
-				net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->unicast[i].ipv4.address.in_addr, buf,
-							  sizeof(buf)),
+				net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->unicast[i].ipv4.address.in_addr,
+							  buf, sizeof(buf)),
 				addr_type_to_str(ifcfg->ip.ipv4->unicast[i].ipv4.addr_type));
 
-		LOG_INF("Subnet:  %s",
-				net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->unicast->netmask, buf, sizeof(buf)));
+		LOG_INF("Subnet:  %s", net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->unicast->netmask,
+											 buf, sizeof(buf)));
 		LOG_INF("Router:  %s",
 				net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->gw, buf, sizeof(buf)));
 
@@ -159,8 +159,8 @@ static void usb_iface_configure(struct net_if *iface)
 
 	net_addr_pton(AF_INET, CONFIG_COPRO_USB_ECM_IPV4_NETMASK, &nm);
 	net_if_ipv4_set_netmask_by_addr(iface, &my, &nm);
-	
-    net_addr_pton(AF_INET, CONFIG_COPRO_USB_ECM_IPV4_GW, &gw);
+
+	net_addr_pton(AF_INET, CONFIG_COPRO_USB_ECM_IPV4_GW, &gw);
 	net_if_ipv4_set_gw(iface, &gw);
 }
 

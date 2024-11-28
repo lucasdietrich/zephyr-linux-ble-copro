@@ -15,6 +15,8 @@ set(app_sources
 )
 
 target_sources_ifdef(CONFIG_COPRO_USB_NETWORK app PRIVATE src/usb_net.c)
+target_sources_ifdef(CONFIG_COPRO_STREAM_CLIENT app PRIVATE src/stream_client.c)
+target_sources_ifdef(CONFIG_COPRO_XIAOMI_LYWSD03MMC app PRIVATE src/xiaomi.c)
 
 target_include_directories(app PRIVATE include)
 target_sources(app PRIVATE ${app_sources})
