@@ -1,17 +1,16 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
+
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <xiaomi.h>
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
-
 LOG_MODULE_REGISTER(xiaomi, LOG_LEVEL_INF);
-
-#define XIAOMI_MANUFACTURER_ADDR_STR "A4:C1:38:00:00:00"
 
 #define XIAOMI_CUSTOMATC_NAME_STARTS_WITH "ATC_"
 #define XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE                                           \
@@ -51,7 +50,8 @@ static bool adv_data_cb(struct bt_data *data, void *user_data)
 	switch (data->type) {
 	case BT_DATA_NAME_COMPLETE: {
 		if ((data->data_len >= XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE) &&
-			(memcmp(data->data, XIAOMI_CUSTOMATC_NAME_STARTS_WITH,
+			(memcmp(data->data,
+					XIAOMI_CUSTOMATC_NAME_STARTS_WITH,
 					XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE) == 0)) {
 
 			/* copy device name */
@@ -90,21 +90,10 @@ static bool adv_data_cb(struct bt_data *data, void *user_data)
 	return true;
 }
 
-static bool bt_addr_manufacturer_match(const bt_addr_t *addr, const bt_addr_t *mf_prefix)
-{
-	return memcmp(&addr->val[3], &mf_prefix->val[3], 3U) == 0;
-}
-
-bool xiomi_bt_addr_manufacturer_match(const bt_addr_t *addr)
-{
-	bt_addr_t mf;
-	bt_addr_from_str(XIAOMI_MANUFACTURER_ADDR_STR, &mf);
-
-	return bt_addr_manufacturer_match(addr, &mf) == true;
-}
-
 bool xiaomi_bt_data_parse(const bt_addr_le_t *addr,
-						 int8_t rssi, struct net_buf_simple *ad, xiaomi_record_t *xc)
+						  int8_t rssi,
+						  struct net_buf_simple *ad,
+						  xiaomi_record_t *xc)
 {
 	int success = false;
 
@@ -120,11 +109,38 @@ bool xiaomi_bt_data_parse(const bt_addr_le_t *addr,
 		bt_addr_to_str(&addr->a, mac_str, sizeof(mac_str));
 		LOG_INF("[XIAOMI] mac: %s rssi: %d bat: %u mV temp: %u "
 				"°C hum: %u %%",
-				mac_str, (int)rssi, xc->measurements.battery_mv,
-				xc->measurements.temperature / 100, xc->measurements.humidity / 100);
-		
+				mac_str,
+				(int)rssi,
+				xc->measurements.battery_mv,
+				xc->measurements.temperature / 100,
+				xc->measurements.humidity / 100);
+
 		success = true;
 	}
 
 	return success;
+}
+
+int xiaomi_record_serialize(const xiaomi_record_t *xc, uint8_t *buf, size_t len)
+{
+	if (len < XIAOMI_RECORD_BUF_SIZE) {
+		return -ENOMEM;
+	}
+
+	buf[0] = xc->addr.a.val[5];
+	buf[1] = xc->addr.a.val[4];
+	buf[2] = xc->addr.a.val[3];
+	buf[3] = xc->addr.a.val[2];
+	buf[4] = xc->addr.a.val[1];
+	buf[5] = xc->addr.a.val[0];
+	buf[6] = xc->addr.type;
+	buf[7] = xc->measurements.rssi;
+	buf[8] = XIAOMI_RECORD_HEADER_VERSION;
+	sys_put_le64(xc->timestamp, &buf[9]);
+	sys_put_le16(xc->measurements.temperature, &buf[17]);
+	sys_put_le16(xc->measurements.humidity, &buf[19]);
+	sys_put_le16(xc->measurements.battery_mv, &buf[21]);
+	buf[23] = xc->measurements.battery_level;
+
+	return XIAOMI_RECORD_BUF_SIZE;
 }

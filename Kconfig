@@ -49,6 +49,7 @@ endif # COPRO_XIAOMI_LYWSD03MMC
 menuconfig COPRO_STREAM_CLIENT
     bool "Coprocessor stream Client"
     default y
+    depends on USB_DEVICE_NETWORK_ECM
     help
       This option allows you to configure the Stream Client settings.
 
@@ -72,11 +73,24 @@ config COPRO_STREAM_TRY_CONNECT_INTERVAL
     help
       The interval in milliseconds to try to connect to the Stream Client.
 
+config COPRO_STREAM_CHANNELS_COUNT
+    int "Stream Channels Count"
+    default 1
+    help
+      The number of channels to use for the Streams.
+
+config COPRO_STREAM_CHANNEL_MSG_MAX_SIZE
+    int "Stream Channel Message Max Size"
+    default 128
+    help
+      The maximum size of the message to send to the Stream Client.
+
 endif # COPRO_STREAM_CLIENT
 
 menuconfig COPRO_CONFIG_SERVER
     bool "Coprocessor configuration server"
     default y
+    depends on USB_DEVICE_NETWORK_ECM
     help
       This option allows you to configure the Configuration Server settings.
 

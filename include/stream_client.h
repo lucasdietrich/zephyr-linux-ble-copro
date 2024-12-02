@@ -12,19 +12,10 @@
 
 #include <zephyr/kernel.h>
 
-int stream_client_init(void);
+int stream_client_start(void);
+
+int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_msgq *msgq);
 
 int stream_try_connect(void);
-
-typedef struct stream_channel {
-	char name[32];		 // channel name
-	uint32_t channel_id; // channel id
-	size_t pl_size;		 // Size of the payload sent on this channel in bytes
-	uint32_t flags;		 // channel flags
-} stream_channel_t;
-
-int stream_channel_setup(uint32_t channel_id, struct k_msgq *msgq, size_t pl_size);
-
-int stream_send_data(uint32_t channel_id, void *data, size_t len);
 
 #endif /* _STREAM_CLIENT_H */

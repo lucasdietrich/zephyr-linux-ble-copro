@@ -20,7 +20,7 @@ AllowShortIfStatementsOnASingleLine: true
 AlignOperands: Align
 AllowShortLoopsOnASingleLine: true
 AlignTrailingComments: true
-BinPackArguments: true
+BinPackArguments: false
 BinPackParameters: false
 AttributeMacros:
   - __aligned

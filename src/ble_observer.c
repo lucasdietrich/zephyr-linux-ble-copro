@@ -17,6 +17,14 @@
 
 LOG_MODULE_REGISTER(obv, LOG_LEVEL_INF);
 
+static bool bt_addr_manufacturer_match(const char *mf_addr_str, const bt_addr_t *addr)
+{
+	bt_addr_t mf;
+	bt_addr_from_str(mf_addr_str, &mf);
+
+	return memcmp(&addr->val[3], &mf.val[3], 3U) == 0;
+}
+
 static void device_found(const bt_addr_le_t *addr,
 						 int8_t rssi,
 						 uint8_t type,
@@ -24,18 +32,25 @@ static void device_found(const bt_addr_le_t *addr,
 {
 	int ret;
 
-	if (xiomi_bt_addr_manufacturer_match(&addr->a) == true) {
+#if CONFIG_COPRO_XIAOMI_LYWSD03MMC
+	if (bt_addr_manufacturer_match(XIAOMI_MANUFACTURER_ADDR_STR, &addr->a) == true) {
 		xiaomi_record_t xc = {0};
 		if (xiaomi_bt_data_parse(addr, rssi, ad, &xc) == true) {
-			// do something with the xiaomi record
-			// stream_send_data(STREAM_CHANNEL_ID_XIAOMI, &xc, sizeof(xc));
 
-			ret = k_msgq_put(&xiaomi_msgq, &xc, K_NO_WAIT);
-			if (ret) {
-				LOG_ERR("Failed to put data in xiaomi_msgq: %d", ret);
+			char buf_record[XIAOMI_RECORD_BUF_SIZE];
+			ret = xiaomi_record_serialize(&xc, buf_record, XIAOMI_RECORD_BUF_SIZE);
+			if (ret < 0) {
+				LOG_ERR("Failed to serialize xiaomi record: %d", ret);
+				return;
+			}
+
+			ret = k_msgq_put(&xiaomi_msgq, buf_record, K_NO_WAIT);
+			if (ret < 0) {
+				LOG_ERR("Failed to put xiaomi record in msgq: %d", ret);
 			}
 		}
 	}
+#endif
 }
 
 int ble_observer_start(void)

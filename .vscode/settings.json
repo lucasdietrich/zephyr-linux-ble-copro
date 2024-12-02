@@ -7,4 +7,7 @@
 	],
 	"editor.autoIndent": "full",
 	"nrf-connect.toolchain.path": "${nrf-connect.zephyrsdk:0.16.1}",
+	"rust-analyzer.linkedProjects": [
+		"${workspaceFolder}/ble-copro-stream-server-rs/Cargo.toml",
+	]
 }

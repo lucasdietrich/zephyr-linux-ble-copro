@@ -10,8 +10,9 @@
 #include <zephyr/usb/usb_device.h>
 
 #include <ble_observer.h>
-#include <usb_net.h>
 #include <stream_client.h>
+#include <usb_net.h>
+#include <xiaomi.h>
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_INF);
 
@@ -21,8 +22,10 @@ int main(void)
 
 	printk("Hello, World!\n");
 
+#if CONFIG_COPRO_USB_NETWORK
 	/* Initialize NET interface management */
 	usb_net_iface_init();
+#endif
 
 	/* Initialize the USB Subsystem */
 	ret = usb_enable(NULL);
@@ -45,8 +48,14 @@ int main(void)
 	/* Start the BLE observer thread */
 	ble_observer_start();
 
-	/* Start the streamc client */
-	stream_client_init();
-	
+#if CONFIG_COPRO_XIAOMI_LYWSD03MMC
+	/* Configure the stream client */
+	stream_client_channel_add(
+		STREAM_CHANNEL_ID_XIAOMI, STREAM_CHANNEL_NAME_XIAOMI, &xiaomi_msgq);
+#endif
+
+	/* Start the stream client */
+	stream_client_start();
+
 	return 0;
 }

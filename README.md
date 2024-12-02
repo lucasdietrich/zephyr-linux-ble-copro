@@ -132,3 +132,8 @@ Ncat: Connection from 192.0.3.2:61748.
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## TODOs
+
+- Add keep-alive messages for the TCP connection.
+- Use a fifo instead of the msgq
