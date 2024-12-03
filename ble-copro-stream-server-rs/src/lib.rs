@@ -5,7 +5,7 @@ pub mod xiaomi;
 
 use stream_channel::StreamChannelError;
 use stream_message::MessageHeader;
-pub use stream_server::{StreamServer, DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT};
+pub use stream_server::{StreamServer, ServerError, DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT};
 
 use thiserror::Error;
 
