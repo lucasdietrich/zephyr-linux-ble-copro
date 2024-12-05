@@ -4,10 +4,7 @@ pub mod stream_server;
 pub mod xiaomi;
 
 use stream_channel::StreamChannelError;
-use stream_message::MessageHeader;
 pub use stream_server::{StreamServer, ServerError, DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT};
-
-use thiserror::Error;
 
 pub trait StreamChannelHandler {
     const CHANNEL_ID: u32;

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
-    stream_channel::StreamChannelError, stream_message::MessageHeader, StreamChannelHandler,
+    stream_channel::StreamChannelError, StreamChannelHandler,
 };
 
 #[derive(Debug)]
@@ -17,6 +17,7 @@ pub struct XiaomiMeasurement {
 
 #[derive(Debug)]
 pub struct XiaomiRecord {
+    pub version: u8,
     pub ble_mac: [u8; 6],
     pub ble_type: u8,
     pub timestamp: i64,
@@ -49,6 +50,7 @@ impl StreamChannelHandler for XiaomiHandler {
         let battery_percent = data[23];
 
         Ok(XiaomiRecord {
+            version,
             ble_mac,
             ble_type,
             timestamp,
