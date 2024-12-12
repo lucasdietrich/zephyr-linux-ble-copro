@@ -3,9 +3,10 @@ use std::fmt::Display;
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
-    stream_channel::StreamChannelError, StreamChannelHandler,
+    ble::BleAddress, stream_channel::StreamChannelError, timestamp::Timestamp, StreamChannelHandler,
 };
 
+//  xiaomi: [XIAOMI] mac: A4:C1:38:EC:1C:6D rssi: -33 bat: 3016 mV temp: 16 °C hum: 42 %
 #[derive(Debug)]
 pub struct XiaomiMeasurement {
     pub rssi: i8,
@@ -15,13 +16,32 @@ pub struct XiaomiMeasurement {
     pub battery_percent: u8,
 }
 
+impl Display for XiaomiMeasurement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "rssi: {} bat: {} mV ({} %) temp: {} °C hum: {} %",
+            self.rssi, self.battery_mv, self.battery_percent, self.temperature, self.humidity
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct XiaomiRecord {
     pub version: u8,
-    pub ble_mac: [u8; 6],
-    pub ble_type: u8,
-    pub timestamp: i64,
+    pub ble_addr: BleAddress,
+    pub timestamp: Timestamp,
     pub measurement: XiaomiMeasurement,
+}
+
+impl Display for XiaomiRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "mac: {} timestamp: {} {}",
+            self.ble_addr, self.timestamp, self.measurement
+        )
+    }
 }
 
 pub struct XiaomiHandler;
@@ -43,16 +63,17 @@ impl StreamChannelHandler for XiaomiHandler {
         let ble_type = data[6];
         let rssi = data[7] as i8;
         let version = data[8];
-        let timestamp = LittleEndian::read_i64(&data[9..17]);
+        let timestamp = Timestamp::Uptime(LittleEndian::read_i64(&data[9..17]) as u64);
         let temperature = LittleEndian::read_i16(&data[17..19]) as f32 / 100.0;
         let humidity = LittleEndian::read_u16(&data[19..21]) as f32 / 100.0;
         let battery_mv = LittleEndian::read_u16(&data[21..23]);
         let battery_percent = data[23];
 
+        let ble_addr = BleAddress::new(ble_mac, ble_type);
+
         Ok(XiaomiRecord {
             version,
-            ble_mac,
-            ble_type,
+            ble_addr,
             timestamp,
             measurement: XiaomiMeasurement {
                 rssi,
@@ -62,22 +83,5 @@ impl StreamChannelHandler for XiaomiHandler {
                 battery_percent,
             },
         })
-    }
-}
-
-impl Display for XiaomiRecord {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "XiaomiRecord {{ MAC {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x} [type {}] timestamp: {} rssi: {} dBm temperature: {} °C humidity: {}, battery: {} mv ({} %) }}",
-            self.ble_mac[0], self.ble_mac[1], self.ble_mac[2], self.ble_mac[3], self.ble_mac[4], self.ble_mac[5],
-            self.ble_type,
-            self.timestamp,
-            self.measurement.rssi,
-            self.measurement.temperature,
-            self.measurement.humidity,
-            self.measurement.battery_mv,
-            self.measurement.battery_percent
-        )
     }
 }

@@ -7,6 +7,8 @@
 
 LOG_MODULE_REGISTER(stream_client, LOG_LEVEL_INF);
 
+#define CHANNEL_CONTROL_ID 0x00000000
+
 typedef enum {
 	STREAM_UNINITIALIZED,
 	STREAM_DISCONNECTED,
@@ -44,6 +46,11 @@ int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_ms
 
 	if (scli.state != STREAM_UNINITIALIZED) {
 		return -EALREADY;
+	}
+
+	if (channel_id == CHANNEL_CONTROL_ID) {
+		/* Reserved channel id */
+		return -EINVAL;
 	}
 
 	if (channel_id == 0 || msgq == NULL || name == NULL || msgq->msg_size == 0 ||
@@ -188,6 +195,7 @@ int thread(void *arg0, void *arg1, void *arg2)
 			ret = k_poll(scli.poll_events, scli.channels_count, K_FOREVER);
 			if (ret < 0) {
 				if (ret == -EAGAIN) {
+					// Timeout, should not happen
 					continue;
 				} else {
 					LOG_ERR("Failed to poll: %d", ret);

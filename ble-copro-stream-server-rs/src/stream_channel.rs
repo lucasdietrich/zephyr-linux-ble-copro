@@ -2,6 +2,7 @@ use thiserror::Error;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
+use crate::control_channel::ControlHandler;
 use crate::stream_message::{ChannelMessage, MessageHeader};
 use crate::xiaomi::XiaomiHandler;
 use crate::StreamChannelHandler;
@@ -55,10 +56,16 @@ impl StreamChannel {
     pub async fn next(&mut self) -> Result<ChannelMessage, StreamChannelError> {
         let (header, data) = self.read_next_message().await?;
 
-        if header.channel_id == XiaomiHandler::CHANNEL_ID {
-            XiaomiHandler::parse_message(data.as_slice()).map(ChannelMessage::Xiaomi)
-        } else {
-            Err(StreamChannelError::UnhandledChannelId)
+        let data = data.as_slice();
+
+        match header.channel_id {
+            XiaomiHandler::CHANNEL_ID => {
+                XiaomiHandler::parse_message(data).map(ChannelMessage::Xiaomi)
+            }
+            ControlHandler::CHANNEL_ID => {
+                ControlHandler::parse_message(data).map(ChannelMessage::Control)
+            }
+            _ => Err(StreamChannelError::UnhandledChannelId),
         }
     }
 }

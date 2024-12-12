@@ -27,10 +27,7 @@ impl StreamServer {
     }
 
     pub async fn accept(&self) -> Result<StreamChannel, ServerError> {
-        let (stream, addr) = self.listener.accept().await?;
-
-        println!("New connection: {}", addr);
-
+        let (stream, _addr) = self.listener.accept().await?;
         Ok(StreamChannel::from(stream))
     }
 }

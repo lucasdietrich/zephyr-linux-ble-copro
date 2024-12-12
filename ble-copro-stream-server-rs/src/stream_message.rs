@@ -1,4 +1,4 @@
-use crate::xiaomi::XiaomiRecord;
+use crate::{control_channel::ControlMessage, xiaomi::XiaomiRecord};
 
 #[derive(Debug)]
 pub struct MessageHeader {
@@ -18,4 +18,5 @@ impl MessageHeader {
 #[derive(Debug)]
 pub enum ChannelMessage {
     Xiaomi(XiaomiRecord),
+    Control(ControlMessage),
 }

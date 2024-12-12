@@ -115,14 +115,6 @@ static void show_ipv4(struct net_if *iface)
 			net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->unicast->netmask, buf, sizeof(buf)));
 		LOG_INF("Router:  %s",
 				net_addr_ntop(AF_INET, &ifcfg->ip.ipv4->gw, buf, sizeof(buf)));
-
-#if defined(CONFIG_NET_DHCPV4)
-		if (ifcfg->ip.ipv4->unicast[i].ipv4.addr_type == NET_ADDR_DHCP) {
-			LOG_INF("DHCPv4 Lease time: %u seconds [state: %s]",
-					ifcfg->dhcpv4.lease_time,
-					net_dhcpv4_state_name(ifcfg->dhcpv4.state));
-		}
-#endif
 	}
 }
 
