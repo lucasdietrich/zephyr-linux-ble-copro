@@ -3,6 +3,7 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/sys/byteorder.h>
 
+#include <led.h>
 #include <stream_client.h>
 
 LOG_MODULE_REGISTER(stream_client, LOG_LEVEL_INF);
@@ -124,6 +125,7 @@ static int try_connect(scli_t *s)
 
 	s->sock	 = sock;
 	s->state = STREAM_CONNECTED;
+	LED_ON();
 
 	LOG_INF("Connected to %s:%d", CONFIG_COPRO_STREAM_HOST, CONFIG_COPRO_STREAM_PORT);
 
@@ -140,6 +142,7 @@ static int disconnect(scli_t *s)
 	}
 
 	s->state = STREAM_DISCONNECTED;
+	LED_OFF();
 
 	return 0;
 }

@@ -32,21 +32,26 @@ host and streams the collected data over a simple TCP protocol.
 
 ### Build and Flash
 
-1. Clone the repository:
+Clone the repository:
    ```bash
    git clone https://github.com/lucasdietrich/zephyr-linux-ble-copro
    cd zephyr-linux-ble-copro
    ```
 
-2. Build for `nrf52840dk`
+Build and flash for `nrf52840dk`
    ```bash
    west build -b nrf52840dk_nrf52840
-   ```
-
-4. Flash the firmware:
-   ```bash
    west flash
    ```
+
+Build for `laird-bl654`
+   ```bash
+   west build -b laird-bl654
+   ```
+
+Download the [build/zephyr/ble-copro.hex](build/zephyr/ble-copro.hex) file,
+set the device in DFU mode (click the button on the dongle), then
+use *nRF Connect Desktop Programmer* to flash the dongle.
 
 ### Configuration
 

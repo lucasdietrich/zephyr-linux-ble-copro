@@ -76,3 +76,46 @@ The controller should be pingable:
 PING 192.0.3.2 (192.0.3.2) 56(84) bytes of data.
 64 bytes from 192.0.3.2: icmp_seq=1 ttl=64 time=3.61 ms
 ```
+
+---
+
+## Yocto integration
+
+In directory `recipes-support/usb-ethernet/`, create the following files:
+
+- `usb-ethernet.bb`
+
+```bash
+DESCRIPTION = "udev rules for ble coprocessor ethernet interface over USB"
+LICENSE = "CLOSED"
+
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+
+SRC_URI = "file:///usb-ethernet.rules \
+        file:///configure-iface \`
+        "
+
+do_install() {
+    install -d ${D}${sysconfdir}/udev/rules.d
+    install -m 0644 ${WORKDIR}/usb-ethernet.rules ${D}${sysconfdir}/udev/rules.d/usb-ethernet.rules
+
+    install -d ${D}${sysconfdir}/udev/scripts
+    install -m 0755 ${WORKDIR}/configure-iface ${D}${sysconfdir}/udev/scripts/configure-iface
+}
+```
+
+- `files/usb-ethernet.rules`
+
+```
+# mac address should be lower case
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:00:5e:00:53:01", NAME="zeth0", RUN+="/etc/udev/scripts/configure-iface"
+```
+
+- `configure-iface`
+
+```bash
+#!/bin/sh
+/sbin/ip link set zeth0 down
+/sbin/ip addr add dev zeth0 192.0.3.1/24
+/sbin/ip link set zeth0 up
+```

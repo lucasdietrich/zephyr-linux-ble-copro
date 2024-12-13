@@ -1,3 +1,9 @@
+config COPRO_LED
+    bool "LED Configuration"
+    default y
+    help
+      This option allows you to use the LED.
+
 menuconfig COPRO_USB_NETWORK
     bool "USB Network Configuration"
     default y

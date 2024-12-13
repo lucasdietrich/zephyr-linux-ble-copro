@@ -5,6 +5,9 @@ SN = 683339521
 build:
 	west build -b nrf52840dk/nrf52840
 
+bl654:
+	west build -b bl654_usb
+
 flash:
 	west -v flash
 
