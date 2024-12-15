@@ -91,11 +91,37 @@ config COPRO_STREAM_CHANNEL_MSG_MAX_SIZE
     help
       The maximum size of the message to send to the Stream Client.
 
+menuconfig COPRO_PING
+    bool "Enable ping functionality"
+    default y
+    help
+      Enables client-side ping capabilities. When this option is set, the
+      client can respond to incoming ping requests from the server.
+    depends on EVENTFD
+
+if COPRO_PING
+
+config COPRO_PING_SERVER
+    bool "Enable client-to-server pings"
+    default n
+    help
+      Allows the client to initiate and send ping requests to the server.
+
+config COPRO_PING_INTERVAL
+    int "Ping request interval (ms)"
+    default 10000
+    help
+      Specifies the time interval, in milliseconds, at which the client
+      sends periodic ping requests to the server.
+    depends on COPRO_PING_SERVER
+
+endif # COPRO_PING
+
 endif # COPRO_STREAM_CLIENT
 
 menuconfig COPRO_CONFIG_SERVER
     bool "Coprocessor configuration server"
-    default y
+    default n
     depends on USB_DEVICE_NETWORK_ECM
     help
       This option allows you to configure the Configuration Server settings.

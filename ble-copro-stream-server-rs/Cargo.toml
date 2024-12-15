@@ -6,13 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["chrono"]
+default = ["tcp-keep-alive", "chrono"]
 chrono = ["dep:chrono"]
+tcp-keep-alive = ["dep:libc"]
 
 [dependencies]
 thiserror = "2"
 byteorder = "1"
 tokio = { version = "1.10.0", features = ["full"] }
 chrono = { version = "0.4", optional = true }
+libc = { version = "0.2", optional = true }
 
 [dev-dependencies]
