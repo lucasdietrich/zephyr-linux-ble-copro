@@ -28,7 +28,7 @@ host and streams the collected data over a simple TCP protocol.
    - Any TCP client tool (e.g., `nc` or custom Python script) on the host to receive data.
 
 3. **Environment Setup**:
-   Follow the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html) to set up your environment.
+   Follow the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html) to set up your environment. 
    Otherwise create a new workspace with the following commands:
    
    ```bash
@@ -37,7 +37,7 @@ host and streams the collected data over a simple TCP protocol.
    python3 -m venv .venv
    source .venv/bin/activate
    pip install west
-   west init -m git@github.com:lucasdietrich/zephyr-linux-ble-copro.git
+   west init -m https://github.com/lucasdietrich/zephyr-linux-ble-copro
    west update
    pip install -r zephyr/scripts/requirements.txt
    cd zephyr-linux-ble-copro
@@ -45,21 +45,15 @@ host and streams the collected data over a simple TCP protocol.
 
 ### Build and Flash
 
-Clone the repository:
-   ```bash
-   git clone https://github.com/lucasdietrich/zephyr-linux-ble-copro
-   cd zephyr-linux-ble-copro
-   ```
-
 Build and flash for `nrf52840dk`
    ```bash
-   west build -b nrf52840dk_nrf52840
+   west build -b nrf52840dk/nrf52840
    west flash
    ```
 
 Build for `laird-bl654`
    ```bash
-   west build -b laird-bl654
+   west build -b bl654_usb
    ```
 
 Download the [build/zephyr/ble-copro.hex](build/zephyr/ble-copro.hex) file,
