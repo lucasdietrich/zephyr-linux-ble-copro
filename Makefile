@@ -1,4 +1,5 @@
 SN = 683339521
+RUNNER = jlink
 
 .PHONY: build flash_sn flash monitor clean
 
@@ -11,7 +12,7 @@ bl654:
 	west build -b bl654_usb
 
 flash:
-	west -v flash
+	west -v flash --runner=$(RUNNER)
 
 debug:
 	west debugserver
@@ -20,7 +21,7 @@ menuconfig:
 	west build -t menuconfig
 
 flash_sn:
-	west -v flash -r nrfjprog --snr $(SN)
+	west -v flash -r nrfjprog --snr $(SN) --runner=$(RUNNER)
 
 monitor:
 	python3 -m serial.tools.miniterm --eol LF --raw /dev/ttyACM0 115200
