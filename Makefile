@@ -2,7 +2,9 @@ SN = 683339521
 
 .PHONY: build flash_sn flash monitor clean
 
-build:
+build: nrf52840
+
+nrf52840:
 	west build -b nrf52840dk/nrf52840
 
 bl654:

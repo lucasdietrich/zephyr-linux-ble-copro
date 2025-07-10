@@ -29,6 +29,19 @@ host and streams the collected data over a simple TCP protocol.
 
 3. **Environment Setup**:
    Follow the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html) to set up your environment.
+   Otherwise create a new workspace with the following commands:
+   
+   ```bash
+   mkdir zephyrproject-ble
+   cd zephyrproject-ble
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install west
+   west init -m git@github.com:lucasdietrich/zephyr-linux-ble-copro.git
+   west update
+   pip install -r zephyr/scripts/requirements.txt
+   cd zephyr-linux-ble-copro
+   ```
 
 ### Build and Flash
 
