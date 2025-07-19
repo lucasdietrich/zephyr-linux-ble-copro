@@ -1,127 +1,78 @@
+// gcc -Wall -O2 -o server server.c
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
-#include <netinet/in.h>
-#include <sys/types.h>
+#include <string.h>
 
-int main(void) {
-    int listen_fd, client_fd;
-    struct sockaddr_in serv_addr;
-    unsigned char buffer[1024];
-    ssize_t n;
+#define ADDR "192.0.3.1"
+#define PORT 4000
+#define KEEP_ALIVE_IDLE  5   /* seconds before first probe  */
+#define KEEP_ALIVE_INTVL 1   /* seconds between probes      */
+#define KEEP_ALIVE_CNT   1   /* probes before giving up     */
 
-    // Create a TCP socket
-    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listen_fd < 0) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set SO_REUSEADDR to allow reuse of the address
+static void set_keepalive(int fd)
+{
     int optval = 1;
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        perror("setsockopt(SO_REUSEADDR)");
-        close(listen_fd);
-        exit(EXIT_FAILURE);
+    setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof optval);
+    optval = KEEP_ALIVE_IDLE;
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &optval,  sizeof(int));
+    optval = KEEP_ALIVE_INTVL;
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &optval, sizeof(int));
+    optval = KEEP_ALIVE_CNT;
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &optval,   sizeof(int));
+}
+
+int main(void)
+{
+    /* create listening socket */
+    int lsock = socket(AF_INET, SOCK_STREAM, 0);
+    if (lsock < 0) { perror("socket"); exit(EXIT_FAILURE); }
+
+    int optval = 1;
+    setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+
+    struct sockaddr_in addr = {
+        .sin_family      = AF_INET,
+        .sin_port        = htons(PORT),
+        .sin_addr.s_addr = inet_addr(ADDR)
+    };
+    if (bind(lsock, (struct sockaddr *)&addr, sizeof addr) < 0) {
+        perror("bind"); exit(EXIT_FAILURE);
+    }
+    if (listen(lsock, 1) < 0) {
+        perror("listen"); exit(EXIT_FAILURE);
     }
 
-    // Prepare the server address structure
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port   = htons(4000);
+    printf("Server listening on %s:%d\n", ADDR, PORT);
 
-    // Convert IP address from text to binary form
-    if (inet_pton(AF_INET, "192.0.3.1", &serv_addr.sin_addr) <= 0) {
-        perror("inet_pton");
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Bind the socket to the given IP and port
-    if (bind(listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("bind");
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Start listening for connections
-    if (listen(listen_fd, 1) < 0) {
-        perror("listen");
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(stderr, "Server is listening on 192.0.3.1:4000...\n");
-
-    // Accept a single client connection
-    client_fd = accept(listen_fd, NULL, NULL);
-    if (client_fd < 0) {
-        perror("accept");
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Enable TCP keepalive
-    optval = 1;
-    if (setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) {
-        perror("setsockopt(SO_KEEPALIVE)");
-        close(client_fd);
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Set TCP_KEEPIDLE = 5 seconds
-    optval = 5;
-    if (setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPIDLE, &optval, sizeof(optval)) < 0) {
-        perror("setsockopt(TCP_KEEPIDLE)");
-        close(client_fd);
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Set TCP_KEEPINTVL = 1 second
-    optval = 1;
-    if (setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPINTVL, &optval, sizeof(optval)) < 0) {
-        perror("setsockopt(TCP_KEEPINTVL)");
-        close(client_fd);
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    // Set TCP_KEEPCNT = 4 probes
-    optval = 4;
-    if (setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPCNT, &optval, sizeof(optval)) < 0) {
-        perror("setsockopt(TCP_KEEPCNT)");
-        close(client_fd);
-        close(listen_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(stderr, "Client connected, receiving data...\n");
-
-    while ((n = recv(client_fd, buffer, sizeof(buffer), 0)) > 0) {
-        // Print received data in hex format
-        for (int i = 0; i < n; i++) {
-            printf("0x%02x ", buffer[i]);
+    for (;;) {
+        int csock = accept(lsock, NULL, NULL);
+        if (csock < 0) {
+            perror("accept");
+            continue;
         }
-        printf("\n");
-        fflush(stdout);
+        printf("Client connected\n");
+
+        set_keepalive(csock);
+
+        char buf[512];
+        ssize_t n;
+        while ((n = read(csock, buf, sizeof buf)) > 0) {
+            printf("Received %zd bytes\n", n);
+        }
+
+        if (n == 0) {
+            printf("Client closed the connection\n");
+        } else {
+            fprintf(stderr, "read error: %s\n", strerror(errno));
+        }
+
+        close(csock);
     }
-
-    if (n < 0) {
-        perror("recv");
-    } else {
-        fprintf(stderr, "Client disconnected.\n");
-    }
-
-    // Close the client and the listening socket
-    close(client_fd);
-    close(listen_fd);
-
-    return 0;
 }

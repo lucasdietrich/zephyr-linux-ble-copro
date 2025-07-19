@@ -8,10 +8,11 @@ manifest:
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
-      
+    - name: zephyrproject-rtos-fork
+      url-base: https://github.com/lucasdietrich
+
   projects:
     - name: zephyr
-      remote: zephyrproject-rtos
-      revision: v4.2.0
+      remote: zephyrproject-rtos-fork
+      revision: fix/tcp-keep-alive
       import: true
-      

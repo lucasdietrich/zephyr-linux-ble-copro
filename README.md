@@ -149,3 +149,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 - Add keep-alive messages for the TCP connection.
 - Use a *ring buffer* API instead of the msgq: <https://docs.zephyrproject.org/latest/doxygen/html/group__ring__buffer__apis.html#ga6c7e76e3ca798e994f738d114cb9a7e3>
+
+## Net diag
+
+Wireshark
+
+   ssh pcluc sudo tcpdump -U -s0 -i zeth0 -w - | "C:\Program Files\Wireshark\Wireshark.exe" -k -i -
