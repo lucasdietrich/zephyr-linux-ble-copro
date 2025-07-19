@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(usb_net_mgmt, LOG_LEVEL_INF);
 static struct net_mgmt_event_callback mgmt_cb[4u];
 
 static void net_event_handler(struct net_mgmt_event_callback *cb,
-							  uint32_t mgmt_event,
+							  uint64_t mgmt_event,
 							  struct net_if *iface);
 static void usb_iface_configure(struct net_if *iface);
 static void usb_iface_deinit(struct net_if *iface);
@@ -62,7 +62,7 @@ void usb_net_iface_init(void)
 	case _val:                                                                           \
 		return #_val
 
-static const char *net_mgmt_event_to_str(uint32_t mgmt_event)
+static const char *net_mgmt_event_to_str(uint64_t mgmt_event)
 {
 	switch (mgmt_event) {
 		_CR(NET_EVENT_ETHERNET_CARRIER_ON);
@@ -119,10 +119,10 @@ static void show_ipv4(struct net_if *iface)
 }
 
 static void net_event_handler(struct net_mgmt_event_callback *cb,
-							  uint32_t mgmt_event,
+							  uint64_t mgmt_event,
 							  struct net_if *iface)
 {
-	LOG_DBG("[face: %p] event: %s (%x)",
+	LOG_DBG("[face: %p] event: %s (%llx)",
 			iface,
 			net_mgmt_event_to_str(mgmt_event),
 			mgmt_event);
