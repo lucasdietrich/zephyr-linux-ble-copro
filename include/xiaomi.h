@@ -28,7 +28,7 @@ typedef struct {
 	bt_addr_le_t addr;					// Record device address
 	xiaomi_measurements_t measurements; // Record measurements
 	int64_t timestamp;					// Time of record (uptime since boot)
-	uint32_t flags;						// Temporary flags
+	uint32_t flags;						// flags
 } xiaomi_record_t;
 
 #define STREAM_CHANNEL_NAME_XIAOMI	  "xiaomi-lywsd03mmc-measurements"

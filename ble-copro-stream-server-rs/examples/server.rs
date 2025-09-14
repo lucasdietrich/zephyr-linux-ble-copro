@@ -1,4 +1,4 @@
-use ble_copro_stream_server::{stream_message::ChannelMessage, StreamServer};
+use ble_copro_stream_server::{stream_message::ChannelMessage, StreamChannelError, StreamServer};
 
 #[tokio::main]
 async fn main() {
@@ -15,10 +15,16 @@ async fn main() {
                     ChannelMessage::Xiaomi(record) => {
                         println!("Xiaomi record: {}", record);
                     }
+                    ChannelMessage::LinkyTic(record) => {
+                        println!("LinkyTic record: {}", record);
+                    }
                     _ => {
                         eprintln!("Unhandled message");
                     }
                 },
+                Err(StreamChannelError::UnhandledChannelId) => {
+                    eprintln!("Unhandled channel ID");
+                }
                 Err(e) => {
                     eprintln!("Error: {}", e);
                     break;

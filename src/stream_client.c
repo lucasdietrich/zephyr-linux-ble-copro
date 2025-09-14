@@ -170,12 +170,14 @@ static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t 
 	// Write the header
 	ret = send(s->sock, buf_hdr, sizeof(buf_hdr), 0);
 	if (ret < 0) {
+		LOG_ERR("Failed to send header: %d errno: %d", ret, errno);
 		return ret;
 	}
 
 	// Write the data
 	ret = send(s->sock, data, len, 0);
 	if (ret < 0) {
+		LOG_ERR("Failed to send data: %d errno: %d", ret, errno);
 		return ret;
 	}
 

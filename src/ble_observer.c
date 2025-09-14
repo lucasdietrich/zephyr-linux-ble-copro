@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "linky.h"
+#include "zephyr/bluetooth/addr.h"
+
 #include <stddef.h>
 #include <stdio.h>
 
@@ -49,6 +52,43 @@ static void device_found(const bt_addr_le_t *addr,
 				LOG_ERR("Failed to put xiaomi record in msgq: %d", ret);
 			}
 		}
+		return;
+	}
+#endif
+
+#if CONFIG_COPRO_LINKY_TIC
+	bool is_linky = false;
+	struct net_buf_simple_state state;
+	net_buf_simple_save(ad, &state);
+	bt_data_parse(ad, linky_adv_data_recognize_cb, &is_linky);
+	net_buf_simple_restore(ad, &state);
+
+	if (is_linky == true) {
+		linky_tic_record_t record = {0};
+		bt_addr_le_copy(&record.addr, addr);
+		record.rssi		 = rssi;
+		record.timestamp = k_uptime_get();
+
+		char addr_str[BT_ADDR_STR_LEN];
+		bt_addr_to_str(&addr->a, addr_str, sizeof(addr_str));
+		LOG_INF("Linky found: %s (RSSI %d)", addr_str, (int)rssi);
+		bt_data_parse(ad, linky_adv_data_parse_measurements_cb, (void *)&record);
+
+		char buf_record[LINKY_RECORD_BUF_SIZE];
+		ret = linky_record_serialize(&record, buf_record, sizeof(buf_record));
+		if (ret < 0) {
+			LOG_ERR("Failed to serialize linky record: %d", ret);
+			return;
+		}
+
+		if ((record.flags & LINKY_RECORD_FLAG_VALID) != 0) {
+			ret = k_msgq_put(&linky_msgq, buf_record, K_NO_WAIT);
+			if (ret < 0) {
+				LOG_ERR("Failed to put linky record in msgq: %d", ret);
+			}
+		}
+
+		return;
 	}
 #endif
 }

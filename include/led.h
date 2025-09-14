@@ -8,7 +8,7 @@
 #define _USB_LED_H
 
 #if CONFIG_COPRO_LED
-#define LED_ON() board_led_on()
+#define LED_ON()  board_led_on()
 #define LED_OFF() board_led_off()
 #else
 #define LED_ON()

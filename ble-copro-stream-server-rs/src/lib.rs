@@ -1,5 +1,6 @@
 pub mod ble;
 pub mod control_channel;
+pub mod linky;
 pub mod stream_channel;
 pub mod stream_message;
 pub mod stream_server;

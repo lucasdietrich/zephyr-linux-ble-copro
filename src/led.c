@@ -1,6 +1,7 @@
-#include <led.h>
-#include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/kernel.h>
+
+#include <led.h>
 
 /* The devicetree node identifier for the "led1" alias. */
 #define LED_NODE DT_ALIAS(led0)
@@ -24,20 +25,20 @@ int board_led_init(void)
 		return ret;
 	}
 
-    ret = gpio_pin_set_dt(&led, 0);
-    if (ret < 0) {
-        return ret;
-    }
+	ret = gpio_pin_set_dt(&led, 0);
+	if (ret < 0) {
+		return ret;
+	}
 
 	return 0;
 }
 
 int board_led_on(void)
 {
-    return gpio_pin_set_dt(&led, 1);
+	return gpio_pin_set_dt(&led, 1);
 }
 
 int board_led_off(void)
 {
-    return gpio_pin_set_dt(&led, 0);
+	return gpio_pin_set_dt(&led, 0);
 }
