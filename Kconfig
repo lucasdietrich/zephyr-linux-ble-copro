@@ -52,6 +52,28 @@ config COPRO_XIAOMI_QUEUE_SIZE
 
 endif # COPRO_XIAOMI_LYWSD03MMC
 
+menuconfig COPRO_LINKY_TIC
+    bool "Linky Meter support"
+    default y
+    help
+      This option allows you to report the measurements from the Linky meter.
+
+if COPRO_LINKY_TIC
+
+config COPRO_LINKY_TIC_COMPLETE_NAME
+    string "Complete Name of the Linky Meter TIC Device"
+    default "Linky TIC"
+    help
+      The complete name of the Linky Meter TIC device to scan for.
+
+config COPRO_LINKY_QUEUE_SIZE
+    int "Queue Size"
+    default 20
+    help
+      The size of the queue to store the measurements from the Linky meter.
+
+endif # COPRO_LINKY_TIC
+
 menuconfig COPRO_STREAM_CLIENT
     bool "Coprocessor stream Client"
     default y
@@ -81,6 +103,7 @@ config COPRO_STREAM_TRY_CONNECT_INTERVAL
 
 config COPRO_STREAM_CHANNELS_COUNT
     int "Stream Channels Count"
+    default 2 if COPRO_XIAOMI_LYWSD03MMC && COPRO_LINKY_TIC
     default 1
     help
       The number of channels to use for the Streams.

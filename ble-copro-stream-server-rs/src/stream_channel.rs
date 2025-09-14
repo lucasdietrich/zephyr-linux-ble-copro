@@ -3,6 +3,7 @@ use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
 use crate::control_channel::ControlHandler;
+use crate::linky::LinkyTicHandler;
 use crate::stream_message::{ChannelMessage, MessageHeader};
 use crate::xiaomi::XiaomiHandler;
 use crate::StreamChannelHandler;
@@ -61,6 +62,9 @@ impl StreamChannel {
         match header.channel_id {
             XiaomiHandler::CHANNEL_ID => {
                 XiaomiHandler::parse_message(data).map(ChannelMessage::Xiaomi)
+            }
+            LinkyTicHandler::CHANNEL_ID => {
+                LinkyTicHandler::parse_message(data).map(ChannelMessage::LinkyTic)
             }
             ControlHandler::CHANNEL_ID => {
                 ControlHandler::parse_message(data).map(ChannelMessage::Control)

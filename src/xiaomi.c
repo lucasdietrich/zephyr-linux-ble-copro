@@ -12,13 +12,13 @@
 
 LOG_MODULE_REGISTER(xiaomi, LOG_LEVEL_INF);
 
-#define XIAOMI_CUSTOMATC_NAME_STARTS_WITH "ATC_"
-#define XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE                                           \
-	(sizeof(XIAOMI_CUSTOMATC_NAME_STARTS_WITH) - 1)
+#define XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH "ATC_"
+#define XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH_SIZE                                          \
+	(sizeof(XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH) - 1)
 
-#define XIAOMI_CUSTOMATC_ADV_PAYLOAD_SIZE sizeof(struct xiaomi_atc_custom_adv_payload)
+#define XIAOMI_CUSTOM_ATC_ADV_PAYLOAD_SIZE sizeof(struct xiaomi_atc_custom_adv_payload)
 
-K_MSGQ_DEFINE(xiaomi_msgq, sizeof(xiaomi_record_t), CONFIG_COPRO_XIAOMI_QUEUE_SIZE, 4);
+K_MSGQ_DEFINE(xiaomi_msgq, XIAOMI_RECORD_BUF_SIZE, CONFIG_COPRO_XIAOMI_QUEUE_SIZE, 4);
 
 /* https://github.com/pvvx/ATC_MiThermometer#custom-format-all-data-little-endian
  */
@@ -49,10 +49,10 @@ static bool adv_data_cb(struct bt_data *data, void *user_data)
 {
 	switch (data->type) {
 	case BT_DATA_NAME_COMPLETE: {
-		if ((data->data_len >= XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE) &&
+		if ((data->data_len >= XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH_SIZE) &&
 			(memcmp(data->data,
-					XIAOMI_CUSTOMATC_NAME_STARTS_WITH,
-					XIAOMI_CUSTOMATC_NAME_STARTS_WITH_SIZE) == 0)) {
+					XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH,
+					XIAOMI_CUSTOM_ATC_NAME_STARTS_WITH_SIZE) == 0)) {
 
 			/* copy device name */
 			char name[128u];
@@ -64,7 +64,7 @@ static bool adv_data_cb(struct bt_data *data, void *user_data)
 		}
 	} break;
 	case BT_DATA_SVC_DATA16: {
-		if (data->data_len == XIAOMI_CUSTOMATC_ADV_PAYLOAD_SIZE) {
+		if (data->data_len == XIAOMI_CUSTOM_ATC_ADV_PAYLOAD_SIZE) {
 			struct xiaomi_atc_custom_adv_payload *const payload =
 				(struct xiaomi_atc_custom_adv_payload *)data->data;
 

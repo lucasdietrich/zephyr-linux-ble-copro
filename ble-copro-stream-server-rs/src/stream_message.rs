@@ -1,4 +1,4 @@
-use crate::{control_channel::ControlMessage, xiaomi::XiaomiRecord};
+use crate::{control_channel::ControlMessage, linky::LinkyTicRecord, xiaomi::XiaomiRecord};
 
 #[derive(Debug)]
 pub struct MessageHeader {
@@ -18,5 +18,6 @@ impl MessageHeader {
 #[derive(Debug)]
 pub enum ChannelMessage {
     Xiaomi(XiaomiRecord),
+    LinkyTic(LinkyTicRecord),
     Control(ControlMessage),
 }
