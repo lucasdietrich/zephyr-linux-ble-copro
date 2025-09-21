@@ -59,7 +59,7 @@ bool linky_adv_data_parse_measurements_cb(struct bt_data *data, void *user_data)
 	return true;
 }
 
-int linky_record_serialize(const linky_tic_record_t *xc, uint8_t *buf, size_t len)
+int linky_record_serialize(const linky_tic_record_t *lc, uint8_t *buf, size_t len)
 {
 	if (len < LINKY_RECORD_BUF_SIZE) {
 		return -ENOMEM;
@@ -75,18 +75,18 @@ int linky_record_serialize(const linky_tic_record_t *xc, uint8_t *buf, size_t le
 	 *  - 64 bytes: raw TIC data
 	 */
 
-	buf[0] = xc->addr.a.val[5];
-	buf[1] = xc->addr.a.val[4];
-	buf[2] = xc->addr.a.val[3];
-	buf[3] = xc->addr.a.val[2];
-	buf[4] = xc->addr.a.val[1];
-	buf[5] = xc->addr.a.val[0];
-	buf[6] = xc->addr.type;
-	buf[7] = xc->rssi;
+	buf[0] = lc->addr.a.val[5];
+	buf[1] = lc->addr.a.val[4];
+	buf[2] = lc->addr.a.val[3];
+	buf[3] = lc->addr.a.val[2];
+	buf[4] = lc->addr.a.val[1];
+	buf[5] = lc->addr.a.val[0];
+	buf[6] = lc->addr.type;
+	buf[7] = lc->rssi;
 	buf[8] = 0x01; // Header version
-	sys_put_le32(xc->flags, &buf[9]);
-	sys_put_le64(xc->timestamp, &buf[13]);
-	memcpy(&buf[21], xc->raw, sizeof(xc->raw));
+	sys_put_le32(lc->flags, &buf[9]);
+	sys_put_le64(lc->timestamp, &buf[13]);
+	memcpy(&buf[21], lc->raw, sizeof(lc->raw));
 
 	return LINKY_RECORD_BUF_SIZE;
 }

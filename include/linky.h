@@ -38,6 +38,6 @@ bool linky_adv_data_parse_measurements_cb(struct bt_data *data, void *user_data)
 #define LINKY_RECORD_BUF_SIZE		(21u + LINKY_TIC_RAW_BUFFER_SIZE)
 #define LINKY_RECORD_HEADER_VERSION 0x01
 
-int linky_record_serialize(const linky_tic_record_t *xc, uint8_t *buf, size_t len);
+int linky_record_serialize(const linky_tic_record_t *lc, uint8_t *buf, size_t len);
 
 #endif /* _LINKY_H */
