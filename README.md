@@ -124,6 +124,15 @@ Hello, World!
 [00:00:08.965,759] <inf> xiaomi: [XIAOMI] mac: A4:C1:38:8D:BA:B4 rssi: -53 bat: 3219 mV temp: 20 °C hum: 47 %
 ```
 
+After 17 days of continuous operation:
+
+```
+[17:57:55.580,505] <inf> main: TIC PAPP: 1290 W IINST: 5 A (IMAX 90 A ISOUSC 30) BASE 43840006 Wh - ADCO XXXXXXXXXXXX (rx B: 156641545 N dt: 10305380 C err: 0)
+[17:57:56.929,687] <inf> main: TIC PAPP: 1260 W IINST: 5 A (IMAX 90 A ISOUSC 30) BASE 43840006 Wh - ADCO XXXXXXXXXXXX (rx B: 156641673 N dt: 10305390 C err: 0)
+[17:57:58.279,724] <inf> main: TIC PAPP: 1300 W IINST: 5 A (IMAX 90 A ISOUSC 30) BASE 43840007 Wh - ADCO XXXXXXXXXXXX (rx B: 156641801 N dt: 10305400 C err: 0)
+[17:58:00.272,399] <inf> main: TIC PAPP: 1280 W IINST: 5 A (IMAX 90 A ISOUSC 30) BASE 43840007 Wh - ADCO XXXXXXXXXXXX (rx B: 156641993 N dt: 10305410 C err: 0)
+```
+
 Linux host console:
 
 ```console
