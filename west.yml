@@ -13,6 +13,6 @@ manifest:
 
   projects:
     - name: zephyr
-      remote: zephyrproject-rtos-fork
-      revision: fix/tcp-keep-alive
+      remote: zephyrproject-rtos
+      revision: v4.3.0
       import: true
