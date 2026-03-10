@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "ble_server.h"
 #include <complex.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
@@ -60,6 +61,14 @@ int main(void)
 
 	/* Start the BLE observer thread */
 	ble_observer_start();
+
+#if CONFIG_COPRO_BLE_SERVER
+	ret = ble_server_start();
+	if (ret != 0) {
+		LOG_ERR("Failed to start BLE server (ret %d)", ret);
+		return ret;
+	}
+#endif
 
 #if CONFIG_COPRO_XIAOMI_LYWSD03MMC
 	/* Configure the stream client */

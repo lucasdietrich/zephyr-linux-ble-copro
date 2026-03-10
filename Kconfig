@@ -133,6 +133,18 @@ config COPRO_CONFIG_PORT
 
 endif # COPRO_CONFIG_SERVER
 
+menuconfig COPRO_BLE_SERVER
+    bool "Coprocessor BLE Server"
+    default n
+    help
+      This option allows you to expose services from the coprocessor as a BLE server.
+
+if COPRO_BLE_SERVER
+
+# TODO
+
+endif # COPRO_BLE_SERVER
+
 menu "Zephyr RTOS Configuration"
 
 source "Kconfig.zephyr"

@@ -19,6 +19,7 @@ target_sources_ifdef(CONFIG_COPRO_STREAM_CLIENT app PRIVATE src/stream_client.c)
 target_sources_ifdef(CONFIG_COPRO_XIAOMI_LYWSD03MMC app PRIVATE src/xiaomi.c)
 target_sources_ifdef(CONFIG_COPRO_LINKY_TIC app PRIVATE src/linky.c)
 target_sources_ifdef(CONFIG_COPRO_LED app PRIVATE src/led.c)
+target_sources_ifdef(CONFIG_COPRO_BLE_SERVER app PRIVATE src/ble_server.c)
 
 target_include_directories(app PRIVATE include)
 target_sources(app PRIVATE ${app_sources})
