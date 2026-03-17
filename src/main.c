@@ -11,6 +11,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
+#include <zephyr/settings/settings.h>
 
 #include <ble_observer.h>
 #include <led.h>
@@ -61,6 +62,12 @@ int main(void)
 	ret = bt_enable(NULL);
 	if (ret != 0) {
 		LOG_ERR("Bluetooth init failed (ret %d)", ret);
+		return ret;
+	}
+
+	ret = settings_load();
+	if (ret != 0) {
+		LOG_ERR("Failed to load settings (ret %d)", ret);
 		return ret;
 	}
 

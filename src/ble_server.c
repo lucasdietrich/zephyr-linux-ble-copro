@@ -11,6 +11,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/bluetooth/gatt.h>
 
+
 LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_DBG);
 
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
