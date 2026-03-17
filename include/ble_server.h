@@ -13,4 +13,7 @@
 
 int ble_server_start(void);
 
+int my_lbs_send_sensor_notify(uint32_t sensor_value);
+int my_lbs_send_button_state_indicate(bool button_state);
+
 #endif /* _BLE_SERVER_H */

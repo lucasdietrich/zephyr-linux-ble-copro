@@ -14,6 +14,7 @@
 
 #include <ble_observer.h>
 #include <led.h>
+#include <button.h>
 #include <linky.h>
 #include <stream_client.h>
 #include <usb_net.h>
@@ -33,6 +34,12 @@ int main(void)
 		return ret;
 	}
 #endif
+
+	ret = board_button_init();
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize button (ret %d)", ret);
+		return ret;
+	}
 
 #if CONFIG_COPRO_USB_NETWORK
 	/* Initialize NET interface management */
