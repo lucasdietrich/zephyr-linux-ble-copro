@@ -96,11 +96,52 @@ static void on_recycled(void)
 	advertising_start();
 }
 
+void on_security_changed(struct bt_conn *conn,
+						 bt_security_t level,
+						 enum bt_security_err err)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	if (!err) {
+		LOG_INF("Security changed: %s level %u\n", addr, level);
+	} else {
+		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
+			err);
+	}
+}
+
+void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	LOG_INF("Passkey for %s: %06u\n", addr, passkey);
+}
+
+void auth_cancel(struct bt_conn *conn)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	LOG_INF("Pairing cancelled: %s\n", addr);
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected              = on_connected,
     .disconnected           = on_disconnected,
     .recycled               = on_recycled,
+	.security_changed 		= on_security_changed,
 };
+
+static struct bt_conn_auth_cb conn_auth_callbacks = {
+	.passkey_display = auth_passkey_display,
+	.cancel = auth_cancel,
+};
+
 
 /** @brief LBS Service UUID. */
 #define BT_UUID_LBS_VAL \
@@ -215,7 +256,7 @@ BT_GATT_SERVICE_DEFINE(
 	/* STEP 2 - Create and add the Client Characteristic Configuration Descriptor */
 	BT_GATT_CCC(mylbsbc_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
-	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_LED, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE, NULL,
+	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_LED, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE_AUTHEN, NULL,
 			       write_led, NULL),
 	/* STEP 12 - Create and add the MYSENSOR characteristic and its CCCD  */
 	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_MYSENSOR, BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_NONE, NULL,
@@ -265,6 +306,12 @@ int ble_server_start(void)
 	ret = bt_id_create(&addr, NULL);
 	if (ret < 0) {
 		printk("Creating new ID failed (err %d)\n", ret);
+	}
+
+	ret = bt_conn_auth_cb_register(&conn_auth_callbacks);
+	if (ret) {
+		LOG_INF("Failed to register authorization callbacks.\n");
+		return -1;
 	}
 
 	k_work_init(&adv_work, adv_work_handler);

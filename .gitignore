@@ -2,3 +2,4 @@ docs/html
 docs/latex
 /build
 /target
+.env
