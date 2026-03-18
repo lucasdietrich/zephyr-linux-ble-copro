@@ -31,9 +31,9 @@ typedef struct {
 	uint32_t flags;						// flags
 } xiaomi_record_t;
 
-#define STREAM_CHANNEL_NAME_XIAOMI	  "xiaomi-lywsd03mmc-measurements"
-#define STREAM_CHANNEL_ID_XIAOMI	  0xFA30FA42lu
-#define STREAM_CHANNEL_PL_SIZE_XIAOMI sizeof(xiaomi_measurements_t)
+#define SC_NAME_XIAOMI	  "xiaomi-lywsd03mmc-measurements"
+#define SC_ID_XIAOMI	  0xFA30FA42lu
+#define SC_PL_SIZE_XIAOMI sizeof(xiaomi_measurements_t)
 
 bool xiaomi_bt_data_parse(const bt_addr_le_t *addr,
 						  int8_t rssi,

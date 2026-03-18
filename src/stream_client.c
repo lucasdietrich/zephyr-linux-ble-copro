@@ -19,13 +19,24 @@ typedef enum {
 typedef struct {
 	char name[32];		 // channel name
 	uint32_t channel_id; // channel id
-	struct k_msgq *msgq;
+	struct k_msgq *tx_msgq;
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	struct k_msgq *rx_msgq; // incoming data from server, NULL if not used
+#endif
 } chan_t;
 
 typedef struct {
 	int sock;
 	scli_state_t state;
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	/* +1 for the RX-disconnect signal slot */
+	struct k_poll_event poll_events[CONFIG_COPRO_STREAM_CHANNELS_COUNT + 1];
+	struct k_poll_signal rx_disconnect_signal; /* fired by RX thread on drop */
+	struct k_sem rx_connected_sem; /* given by TX on connect, taken by RX */
+#else
 	struct k_poll_event poll_events[CONFIG_COPRO_STREAM_CHANNELS_COUNT];
+#endif
+	struct k_mutex conn_mutex;     /* serialises disconnect() */
 	size_t channels_count;
 	chan_t channels[CONFIG_COPRO_STREAM_CHANNELS_COUNT];
 } scli_t;
@@ -36,12 +47,19 @@ static scli_t scli = {
 	.sock  = -1,
 };
 
-int thread(void *arg0, void *arg1, void *arg2);
+int tx_thread(void *arg0, void *arg1, void *arg2);
 
 K_THREAD_DEFINE(
-	stream_tid, 2048u, thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+	tx_stream_tid, 2048u, tx_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
 
-int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_msgq *msgq)
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+int rx_thread(void *arg0, void *arg1, void *arg2);
+K_THREAD_DEFINE(
+	rx_stream_tid, 2048u, rx_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+#endif
+
+int stream_client_channel_add(uint32_t channel_id, const char *name,
+							   struct k_msgq *tx_msgq, struct k_msgq *rx_msgq)
 {
 	int i;
 
@@ -54,17 +72,27 @@ int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_ms
 		return -EINVAL;
 	}
 
-	if (channel_id == 0 || msgq == NULL || name == NULL || msgq->msg_size == 0 ||
-		msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE) {
+	if (channel_id == 0 || tx_msgq == NULL || name == NULL || tx_msgq->msg_size == 0 ||
+		tx_msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE) {
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	if (rx_msgq != NULL && (rx_msgq->msg_size == 0 ||
+		rx_msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE)) {
+		return -EINVAL;
+	}
+#endif
 
 	for (i = 0; i < CONFIG_COPRO_STREAM_CHANNELS_COUNT; i++) {
 		if (scli.channels[i].channel_id == 0 ||
 			scli.channels[i].channel_id == channel_id) {
 			strncpy(scli.channels[i].name, name, sizeof(scli.channels[i].name));
 			scli.channels[i].channel_id = channel_id;
-			scli.channels[i].msgq		= msgq;
+			scli.channels[i].tx_msgq    = tx_msgq;
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+			scli.channels[i].rx_msgq    = rx_msgq;
+#endif
 
 			scli.channels_count++;
 
@@ -81,14 +109,29 @@ int stream_client_start(void)
 		return -EALREADY;
 	}
 
+	k_mutex_init(&scli.conn_mutex);
+
 	for (int i = 0; i < scli.channels_count; i++) {
 		k_poll_event_init(&scli.poll_events[i],
 						  K_POLL_TYPE_MSGQ_DATA_AVAILABLE,
 						  K_POLL_MODE_NOTIFY_ONLY,
-						  scli.channels[i].msgq);
+						  scli.channels[i].tx_msgq);
 	}
 
-	k_thread_start(stream_tid);
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	k_sem_init(&scli.rx_connected_sem, 0, 1);
+	k_poll_signal_init(&scli.rx_disconnect_signal);
+
+	/* Last poll slot watches for disconnection signaled by the RX thread */
+	k_poll_event_init(&scli.poll_events[scli.channels_count],
+					  K_POLL_TYPE_SIGNAL,
+					  K_POLL_MODE_NOTIFY_ONLY,
+					  &scli.rx_disconnect_signal);
+
+	k_thread_start(rx_stream_tid);
+#endif
+
+	k_thread_start(tx_stream_tid);
 
 	scli.state = STREAM_DISCONNECTED;
 
@@ -129,6 +172,13 @@ static int try_connect(scli_t *s)
 
 	LOG_INF("Connected to %s:%d", CONFIG_COPRO_STREAM_HOST, CONFIG_COPRO_STREAM_PORT);
 
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	/* Reset stale disconnect signal, then wake the RX thread */
+	k_poll_signal_reset(&s->rx_disconnect_signal);
+	s->poll_events[s->channels_count].state = K_POLL_STATE_NOT_READY;
+	k_sem_give(&s->rx_connected_sem);
+#endif
+
 	return 0;
 }
 
@@ -136,13 +186,15 @@ static int disconnect(scli_t *s)
 {
 	__ASSERT_NO_MSG(s);
 
+	k_mutex_lock(&s->conn_mutex, K_FOREVER);
 	if (s->sock >= 0) {
 		close(s->sock);
-		s->sock = -1;
+		s->sock  = -1;
+		s->state = STREAM_DISCONNECTED;
+		LED_OFF();
+		LOG_INF("Disconnected");
 	}
-
-	s->state = STREAM_DISCONNECTED;
-	LED_OFF();
+	k_mutex_unlock(&s->conn_mutex);
 
 	return 0;
 }
@@ -184,7 +236,7 @@ static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t 
 	return 0;
 }
 
-int thread(void *arg0, void *arg1, void *arg2)
+int tx_thread(void *arg0, void *arg1, void *arg2)
 {
 	int ret;
 	char buf[CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE];
@@ -197,29 +249,43 @@ int thread(void *arg0, void *arg1, void *arg2)
 			}
 			break;
 		case STREAM_CONNECTED:
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+			/* Poll TX msgqs (slots 0..channels_count-1) plus the RX-disconnect
+			 * signal (slot channels_count). */
+			ret = k_poll(scli.poll_events, scli.channels_count + 1, K_FOREVER);
+#else
 			ret = k_poll(scli.poll_events, scli.channels_count, K_FOREVER);
-			if (ret < 0) {
-				if (ret == -EAGAIN) {
-					// Timeout, should not happen
-					continue;
-				} else {
-					LOG_ERR("Failed to poll: %d", ret);
-					disconnect(&scli);
-				}
+#endif
+			if (ret < 0 && ret != -EAGAIN) {
+				LOG_ERR("Failed to poll: %d", ret);
+				disconnect(&scli);
+				break;
 			}
 
-			for (int i = 0; i < scli.channels_count; i++) {
-				if (scli.poll_events[i].state == K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+			/* Check whether the RX thread signaled a disconnect */
+			if (scli.poll_events[scli.channels_count].state ==
+				K_POLL_STATE_SIGNALED) {
+				k_poll_signal_reset(&scli.rx_disconnect_signal);
+				scli.poll_events[scli.channels_count].state =
+					K_POLL_STATE_NOT_READY;
+				/* State already set to DISCONNECTED by the RX thread */
+				break;
+			}
+#endif
+
+			for (int i = 0; i < scli.channels_count &&
+							scli.state == STREAM_CONNECTED; i++) {
+				if (scli.poll_events[i].state ==
+					K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
 					chan_t *chan = &scli.channels[i];
 
-					if (k_msgq_get(chan->msgq, (void *)buf, K_NO_WAIT) == 0) {
+					if (k_msgq_get(chan->tx_msgq, (void *)buf, K_NO_WAIT) == 0) {
 						ret = channel_send_data(
-							&scli, chan->channel_id, buf, chan->msgq->msg_size);
+							&scli, chan->channel_id, buf, chan->tx_msgq->msg_size);
 						if (ret < 0) {
 							LOG_ERR("[channel %s:%X] Failed to send data: %d",
-									chan->name,
-									chan->channel_id,
-									ret);
+									chan->name, chan->channel_id, ret);
 							disconnect(&scli);
 						}
 					}
@@ -233,3 +299,93 @@ int thread(void *arg0, void *arg1, void *arg2)
 		}
 	}
 }
+
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+/* Receive exactly @len bytes from @sock, retrying on short reads.
+ * Returns @len on success, or a negative errno on connection loss. */
+static int recv_all(int sock, void *buf, size_t len)
+{
+	size_t received = 0;
+
+	while (received < len) {
+		int ret = recv(sock, (uint8_t *)buf + received, len - received, 0);
+
+		if (ret == 0) {
+			return -ECONNRESET;
+		}
+		if (ret < 0) {
+			return -errno;
+		}
+		received += ret;
+	}
+
+	return (int)received;
+}
+
+int rx_thread(void *arg0, void *arg1, void *arg2)
+{
+	uint8_t hdr[6];
+	uint8_t buf[CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE];
+
+	for (;;) {
+		/* Block until the TX thread establishes a connection */
+		k_sem_take(&scli.rx_connected_sem, K_FOREVER);
+
+		LOG_DBG("RX thread: connection active, starting receive loop");
+
+		while (scli.state == STREAM_CONNECTED) {
+			/* Read the 6-byte frame header: 4-byte channel id + 2-byte length */
+			int ret = recv_all(scli.sock, hdr, sizeof(hdr));
+
+			if (ret < 0) {
+				LOG_INF("RX: connection lost reading header (%d)", ret);
+				disconnect(&scli);
+				k_poll_signal_raise(&scli.rx_disconnect_signal, 0);
+				break;
+			}
+
+			uint32_t channel_id = sys_get_le32(hdr);
+			uint16_t data_len   = sys_get_le16(&hdr[4]);
+
+			if (data_len > sizeof(buf)) {
+				LOG_ERR("RX: oversized frame (%u B) for channel 0x%08X – dropping",
+						data_len, channel_id);
+				disconnect(&scli);
+				k_poll_signal_raise(&scli.rx_disconnect_signal, 0);
+				break;
+			}
+
+			if (data_len > 0) {
+				ret = recv_all(scli.sock, buf, data_len);
+				if (ret < 0) {
+					LOG_INF("RX: connection lost reading payload (%d)", ret);
+					disconnect(&scli);
+					k_poll_signal_raise(&scli.rx_disconnect_signal, 0);
+					break;
+				}
+			}
+
+			/* Dispatch to the matching channel's rx_msgq */
+			bool dispatched = false;
+
+			for (int i = 0; i < scli.channels_count; i++) {
+				if (scli.channels[i].channel_id == channel_id) {
+					if (scli.channels[i].rx_msgq != NULL) {
+						ret = k_msgq_put(scli.channels[i].rx_msgq, buf, K_NO_WAIT);
+						if (ret < 0) {
+							LOG_WRN("RX [%s]: queue full, dropping message",
+									scli.channels[i].name);
+						}
+					}
+					dispatched = true;
+					break;
+				}
+			}
+
+			if (!dispatched) {
+				LOG_WRN("RX: no channel registered for id 0x%08X", channel_id);
+			}
+		}
+	}
+}
+#endif /* CONFIG_COPRO_STREAM_CHANNEL_RX */

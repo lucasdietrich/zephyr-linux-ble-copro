@@ -87,7 +87,7 @@ int main(void)
 #if CONFIG_COPRO_XIAOMI_LYWSD03MMC
 	/* Configure the stream client */
 	ret = stream_client_channel_add(
-		STREAM_CHANNEL_ID_XIAOMI, STREAM_CHANNEL_NAME_XIAOMI, &xiaomi_msgq);
+		SC_ID_XIAOMI, SC_NAME_XIAOMI, &xiaomi_msgq, NULL);
 	if (ret < 0) {
 		LOG_ERR("Failed to add xiaomi channel to stream client: %d", ret);
 		return ret;
@@ -97,14 +97,14 @@ int main(void)
 #if CONFIG_COPRO_LINKY_TIC
 	/* Configure the stream client */
 	ret = stream_client_channel_add(
-		STREAM_CHANNEL_ID_LINKY_TIC, STREAM_CHANNEL_NAME_LINKY_TIC, &linky_msgq);
+		SC_ID_LINKY_TIC, SC_NAME_LINKY_TIC, &linky_msgq, NULL);
 	if (ret < 0) {
 		LOG_ERR("Failed to add linky channel to stream client: %d", ret);
 		return ret;
 	}
 #endif /* CONFIG_COPRO_LINKY_TIC */
 
-	/* Start the stream client */
+	/* Start the stream client after all channels have been added */
 	stream_client_start();
 
 	return 0;

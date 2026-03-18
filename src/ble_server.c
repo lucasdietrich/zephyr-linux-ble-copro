@@ -1,6 +1,8 @@
 #include "ble_server.h"
 #include "button.h"
 #include "led.h"
+#include "stream_client.h"
+#include "zephyr/sys/byteorder.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -11,6 +13,10 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/bluetooth/gatt.h>
 
+K_MSGQ_DEFINE(ble_ctrl_tx_msgq,
+			  SC_TX_PAYLOAD_SIZE_BLE_CONTROL,
+			  SC_TX_MSG_QUEUE_SIZE_BLE_CONTROL,
+			  4);
 
 LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_DBG);
 
@@ -80,6 +86,7 @@ void on_connected(struct bt_conn *conn, uint8_t err)
 
     // TODO
     board_led_off();
+	bt_ctrl_msg_send_connected(bt_conn_get_dst(conn));
 }
 
 void on_disconnected(struct bt_conn *conn, uint8_t reason)
@@ -89,6 +96,7 @@ void on_disconnected(struct bt_conn *conn, uint8_t reason)
 
     // TODO
     board_led_on();
+	bt_ctrl_msg_send_disconnected(bt_conn_get_dst(conn));
 }
 
 static void on_recycled(void)
@@ -107,6 +115,10 @@ void on_security_changed(struct bt_conn *conn,
 
 	if (!err) {
 		LOG_INF("Security changed: %s level %u\n", addr, level);
+
+		if (level == BT_SECURITY_L4) {
+			bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), true);
+		}
 	} else {
 		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
 			err);
@@ -120,6 +132,7 @@ void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	LOG_INF("Passkey for %s: %06u\n", addr, passkey);
+	bt_ctrl_msg_send_pairing_code(bt_conn_get_dst(conn), passkey);
 }
 
 void auth_cancel(struct bt_conn *conn)
@@ -129,6 +142,7 @@ void auth_cancel(struct bt_conn *conn)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	LOG_INF("Pairing cancelled: %s\n", addr);
+	bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), false);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -298,6 +312,15 @@ int ble_server_start(void)
 {
 	int ret;
 
+	/* Configure the stream client */
+	ret = stream_client_channel_add(SC_ID_BLE_CONTROL,
+									SC_NAME_BLE_CONTROL,
+									&ble_ctrl_tx_msgq, NULL);
+	if (ret < 0) {
+		LOG_ERR("Failed to add linky channel to stream client: %d", ret);
+		return ret;
+	}
+
 	bt_addr_le_t addr;
 	ret = bt_addr_le_from_str("FF:EE:DD:CC:BB:AA", "random", &addr);
 	if (ret) {
@@ -319,4 +342,100 @@ int ble_server_start(void)
 	advertising_start();
 
 	return 0;
+}
+
+static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, size_t buf_size)
+{
+	if (buf_size < sizeof(struct ble_ctrl_tx_msg)) {
+		LOG_ERR("Buffer too small for serialization");
+		return;
+	}
+
+	memset(buf, 0, buf_size);
+
+	sys_put_le32(msg->cmd, &buf[0]);
+	buf[4] = msg->addr.type;
+	memcpy(&buf[5], &msg->addr.a.val, sizeof(msg->addr.a.val));
+	switch (msg->cmd) {
+		case BLE_CTRL_CMD_PAIRING_CODE:
+			sys_put_le32(msg->param.pairing_code.passkey, &buf[4 + sizeof(bt_addr_le_t)]);
+			break;
+		case BLE_CTRL_CMD_PAIRING_RESULT:
+			buf[4 + sizeof(bt_addr_le_t)] = msg->param.pairing_result.success ? 0x00 : 0x01;
+			break;
+		case BLE_CTRL_CMD_CONNECTED:
+		case BLE_CTRL_CMD_DISCONNECTED:
+			/* No additional parameters */
+			break;
+		default:
+			LOG_ERR("Unknown command: %u", msg->cmd);
+			break;
+	}
+}
+
+int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_CMD_PAIRING_CODE,
+		.addr = *addr,
+		.param = {
+			.pairing_code = {
+				.passkey = passkey,
+			},
+		},
+	};
+
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
+
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+}
+
+int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_CMD_PAIRING_RESULT,
+		.addr = *addr,
+		.param = {
+			.pairing_result = {
+				.success = success,
+			},
+		},
+	};
+
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
+
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+}
+
+int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_CMD_CONNECTED,
+		.addr = *addr,
+	};
+
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
+
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+}
+
+int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_CMD_DISCONNECTED,
+		.addr = *addr,
+		.param = {
+			.pairing_result = {
+				.success = false,
+			},
+		},
+	};
+
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
+
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
 }

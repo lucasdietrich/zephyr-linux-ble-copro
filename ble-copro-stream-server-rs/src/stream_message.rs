@@ -1,4 +1,7 @@
-use crate::{control_channel::ControlMessage, linky::LinkyTicRecord, xiaomi::XiaomiRecord};
+use crate::{
+    ble_control::BleControlPayload, control_channel::ControlMessage, linky::LinkyTicRecord,
+    xiaomi::XiaomiRecord,
+};
 
 #[derive(Debug)]
 pub struct MessageHeader {
@@ -19,5 +22,6 @@ impl MessageHeader {
 pub enum ChannelMessage {
     Xiaomi(XiaomiRecord),
     LinkyTic(LinkyTicRecord),
+    BleControl(BleControlPayload),
     Control(ControlMessage),
 }

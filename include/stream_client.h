@@ -14,7 +14,8 @@
 
 int stream_client_start(void);
 
-int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_msgq *msgq);
+int stream_client_channel_add(uint32_t channel_id, const char *name,
+							   struct k_msgq *tx_msgq, struct k_msgq *rx_msgq);
 
 int stream_try_connect(void);
 

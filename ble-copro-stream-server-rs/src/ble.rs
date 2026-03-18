@@ -28,6 +28,21 @@ pub struct BleAddress {
 }
 
 impl BleAddress {
+    pub fn from_raw(addr: &[u8]) -> Option<BleAddress> {
+        if addr.len() != 7 {
+            return None;
+        }
+        let ble_type = match addr[0] {
+            0 => BleType::Public,
+            1 => BleType::Random,
+            2 => BleType::PublicStatic,
+            3 => BleType::RandomStatic,
+            _ => BleType::Unknown,
+        };
+        let mac = [addr[1], addr[2], addr[3], addr[4], addr[5], addr[6]];
+        Some(BleAddress { mac, ble_type })
+    }
+
     pub fn new(mac: [u8; 6], ble_type: u8) -> BleAddress {
         let ble_type = match ble_type {
             0 => BleType::Public,

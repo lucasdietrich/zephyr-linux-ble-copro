@@ -109,10 +109,19 @@ config COPRO_STREAM_CHANNELS_COUNT
       The number of channels to use for the Streams.
 
 config COPRO_STREAM_CHANNEL_MSG_MAX_SIZE
-    int "Stream Channel Message Max Size"
+    int "Stream Channel (SC) Message Max Size"
     default 128
     help
       The maximum size of the message to send to the Stream Client.
+
+config COPRO_STREAM_CHANNEL_RX
+    bool "Enable RX (server-to-device) channel support"
+    default n
+    help
+      When enabled, a dedicated RX thread is started. It reads incoming
+      frames from the server and dispatches each payload to the rx_msgq
+      of the matching channel (if one was registered). Disable this to
+      reduce flash and RAM when bidirectional communication is not needed.
 
 endif # COPRO_STREAM_CLIENT
 

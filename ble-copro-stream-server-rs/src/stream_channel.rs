@@ -2,6 +2,7 @@ use thiserror::Error;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
+use crate::ble_control::BleControlHandler;
 use crate::control_channel::ControlHandler;
 use crate::linky::LinkyTicHandler;
 use crate::stream_message::{ChannelMessage, MessageHeader};
@@ -20,8 +21,8 @@ pub enum StreamChannelError {
     InvalidMessageData,
     #[error("Invalid message Length")]
     InvalidMessageLength,
-    #[error("Unhandled channel ID")]
-    UnhandledChannelId,
+    #[error("Unhandled channel ID: {0}")]
+    UnhandledChannelId(u32),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -69,7 +70,10 @@ impl StreamChannel {
             ControlHandler::CHANNEL_ID => {
                 ControlHandler::parse_message(data).map(ChannelMessage::Control)
             }
-            _ => Err(StreamChannelError::UnhandledChannelId),
+            BleControlHandler::CHANNEL_ID => {
+                BleControlHandler::parse_message(data).map(ChannelMessage::BleControl)
+            }
+            _ => Err(StreamChannelError::UnhandledChannelId(header.channel_id)),
         }
     }
 }

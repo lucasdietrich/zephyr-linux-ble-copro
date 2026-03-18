@@ -18,12 +18,15 @@ async fn main() {
                     ChannelMessage::LinkyTic(record) => {
                         println!("LinkyTic record: {}", record);
                     }
+                    ChannelMessage::BleControl(ctrl) => {
+                        println!("BLE control message: {:?}", ctrl);
+                    }
                     _ => {
                         eprintln!("Unhandled message");
                     }
                 },
-                Err(StreamChannelError::UnhandledChannelId) => {
-                    eprintln!("Unhandled channel ID");
+                Err(StreamChannelError::UnhandledChannelId(channel_id)) => {
+                    eprintln!("Unhandled channel ID: 0x{:x}", channel_id);
                 }
                 Err(e) => {
                     eprintln!("Error: {}", e);

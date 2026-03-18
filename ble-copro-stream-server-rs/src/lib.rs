@@ -1,11 +1,12 @@
 pub mod ble;
 pub mod control_channel;
-pub mod linky;
+pub mod proto;
 pub mod stream_channel;
 pub mod stream_message;
 pub mod stream_server;
 pub mod timestamp;
-pub mod xiaomi;
+
+pub use proto::*;
 
 pub use stream_channel::StreamChannelError;
 pub use stream_server::{ServerError, StreamServer, DEFAULT_LISTEN_IP, DEFAULT_LISTEN_PORT};
