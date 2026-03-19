@@ -11,10 +11,37 @@
 
 #include <zephyr/bluetooth/addr.h>
 
-int ble_server_start(void);
+/* ---------------------------------------------------------------------------
+ * Garage Control Service
+ *
+ * Attribute layout:
+ *  0  – primary service declaration
+ *  1  – left door characteristic declaration
+ *  2  – left door characteristic value       ← notify target
+ *  3  – left door CCC descriptor
+ *  4  – right door characteristic declaration
+ *  5  – right door characteristic value      ← notify target
+ *  6  – right door CCC descriptor
+ *  7  – gate characteristic declaration
+ *  8  – gate characteristic value            ← notify target
+ *  9  – gate CCC descriptor
+ * ---------------------------------------------------------------------------*/
 
-int my_lbs_send_sensor_notify(uint32_t sensor_value);
-int my_lbs_send_button_state_indicate(bool button_state);
+#define BT_UUID_GARAGE_SERVICE_VAL \
+	BT_UUID_128_ENCODE(0x539f0000, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
+#define BT_UUID_GARAGE_LEFT_DOOR_VAL \
+	BT_UUID_128_ENCODE(0x539f0001, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
+#define BT_UUID_GARAGE_RIGHT_DOOR_VAL \
+	BT_UUID_128_ENCODE(0x539f0002, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
+#define BT_UUID_GARAGE_GATE_VAL \
+	BT_UUID_128_ENCODE(0x539f0003, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
+
+#define BT_UUID_GARAGE_SERVICE    BT_UUID_DECLARE_128(BT_UUID_GARAGE_SERVICE_VAL)
+#define BT_UUID_GARAGE_LEFT_DOOR  BT_UUID_DECLARE_128(BT_UUID_GARAGE_LEFT_DOOR_VAL)
+#define BT_UUID_GARAGE_RIGHT_DOOR BT_UUID_DECLARE_128(BT_UUID_GARAGE_RIGHT_DOOR_VAL)
+#define BT_UUID_GARAGE_GATE       BT_UUID_DECLARE_128(BT_UUID_GARAGE_GATE_VAL)
+
+int ble_server_start(void);
 
 typedef enum {
 	BLE_CTRL_CMD_CONNECTED		   = 0x01,

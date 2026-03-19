@@ -21,6 +21,9 @@ async fn main() {
                     ChannelMessage::BleControl(ctrl) => {
                         println!("BLE control message: {:?}", ctrl);
                     }
+                    ChannelMessage::DeviceControl(cmd) => {
+                        println!("Device control command: {:?}", cmd);
+                    }
                     _ => {
                         eprintln!("Unhandled message");
                     }

@@ -17,7 +17,7 @@ typedef enum {
 } scli_state_t;
 
 typedef struct {
-	char name[32];		 // channel name
+	char name[32u];		 // channel name
 	uint32_t channel_id; // channel id
 	struct k_msgq *tx_msgq;
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)

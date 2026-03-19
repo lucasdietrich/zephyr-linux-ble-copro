@@ -4,6 +4,7 @@ use tokio::net::TcpStream;
 
 use crate::ble_control::BleControlHandler;
 use crate::control_channel::ControlHandler;
+use crate::device_control::DeviceControlHandler;
 use crate::linky::LinkyTicHandler;
 use crate::stream_message::{ChannelMessage, MessageHeader};
 use crate::xiaomi::XiaomiHandler;
@@ -72,6 +73,9 @@ impl StreamChannel {
             }
             BleControlHandler::CHANNEL_ID => {
                 BleControlHandler::parse_message(data).map(ChannelMessage::BleControl)
+            }
+            DeviceControlHandler::CHANNEL_ID => {
+                DeviceControlHandler::parse_message(data).map(ChannelMessage::DeviceControl)
             }
             _ => Err(StreamChannelError::UnhandledChannelId(header.channel_id)),
         }

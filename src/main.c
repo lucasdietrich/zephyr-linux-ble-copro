@@ -16,6 +16,7 @@
 #include <ble_observer.h>
 #include <led.h>
 #include <button.h>
+#include <device_control.h>
 #include <linky.h>
 #include <stream_client.h>
 #include <usb_net.h>
@@ -103,6 +104,19 @@ int main(void)
 		return ret;
 	}
 #endif /* CONFIG_COPRO_LINKY_TIC */
+
+#if CONFIG_COPRO_DEVICE_CONTROL
+	ret = stream_client_channel_add(SC_ID_DEVICE_CONTROL,
+									SC_NAME_DEVICE_CONTROL,
+									&device_control_tx_msgq,
+									&device_control_rx_msgq);
+	if (ret < 0) {
+		LOG_ERR("Failed to register device-control channel: %d", ret);
+		return ret;
+	}
+
+	device_control_start();
+#endif /* CONFIG_COPRO_DEVICE_CONTROL */
 
 	/* Start the stream client after all channels have been added */
 	stream_client_start();

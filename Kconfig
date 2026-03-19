@@ -125,6 +125,34 @@ config COPRO_STREAM_CHANNEL_RX
 
 endif # COPRO_STREAM_CLIENT
 
+menuconfig COPRO_DEVICE_CONTROL
+    bool "Device Control channel"
+    default n
+    depends on COPRO_STREAM_CLIENT
+    select COPRO_STREAM_CHANNEL_RX
+    help
+      Enables the device-control stream channel.  Commands (e.g. open
+      garage door) are sent from the device to the server, and state
+      updates (e.g. garage-door positions) are received from the server.
+
+if COPRO_DEVICE_CONTROL
+
+config COPRO_DEVICE_CONTROL_CMD_QUEUE_SIZE
+    int "Command queue size"
+    default 8
+    help
+      Number of outgoing command messages that can be buffered before the
+      TX thread drains them.
+
+config COPRO_DEVICE_CONTROL_STATE_QUEUE_SIZE
+    int "State queue size"
+    default 8
+    help
+      Number of incoming state messages that can be buffered before the
+      application reads them.
+
+endif # COPRO_DEVICE_CONTROL
+
 menuconfig COPRO_CONFIG_SERVER
     bool "Coprocessor configuration server"
     default n

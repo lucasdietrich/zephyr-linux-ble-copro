@@ -1,8 +1,9 @@
 #include "ble_server.h"
-#include "button.h"
 #include "led.h"
 #include "stream_client.h"
 #include "zephyr/sys/byteorder.h"
+
+#include <device_control.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -49,7 +50,7 @@ static const struct bt_data ad[] = {
 static const struct bt_data sd[] = {
 	// BT_DATA(BT_DATA_URI, url_data, sizeof(url_data)),
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL,
-				  BT_UUID_128_ENCODE(0x00001523, 0x1212, 0xefde, 0x1523, 0x785feabcd123)),
+				  BT_UUID_128_ENCODE(0x539f0000, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)),
 };
 
 static const struct bt_le_adv_param *adv_param = BT_LE_ADV_PARAM(
@@ -157,156 +158,163 @@ static struct bt_conn_auth_cb conn_auth_callbacks = {
 	.cancel = auth_cancel,
 };
 
+#if defined(CONFIG_COPRO_DEVICE_CONTROL)
 
-/** @brief LBS Service UUID. */
-#define BT_UUID_LBS_VAL \
-	BT_UUID_128_ENCODE(0x00001523, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
-	
-/** @brief Button Characteristic UUID. */
-#define BT_UUID_LBS_BUTTON_VAL \
-	BT_UUID_128_ENCODE(0x00001524, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
-	
-/** @brief LED Characteristic UUID. */
-#define BT_UUID_LBS_LED_VAL \
-  BT_UUID_128_ENCODE(0x00001525, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
+static bool indicate_left_door_enabled;
+static bool indicate_right_door_enabled;
+static bool indicate_gate_enabled;
 
-  
-#define BT_UUID_LBS BT_UUID_DECLARE_128(BT_UUID_LBS_VAL)
-#define BT_UUID_LBS_BUTTON BT_UUID_DECLARE_128(BT_UUID_LBS_BUTTON_VAL)
-#define BT_UUID_LBS_LED BT_UUID_DECLARE_128(BT_UUID_LBS_LED_VAL)
-
-static bool notify_mysensor_enabled;
-static bool indicate_enabled;
-
-/* STEP 4 - Define an indication parameter */
-static struct bt_gatt_indicate_params ind_params;
-
-/* STEP 3 - Implement the configuration change callback function */
-static void mylbsbc_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
+static void garage_left_door_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
-	indicate_enabled = (value == BT_GATT_CCC_INDICATE);
+	indicate_left_door_enabled = (value == BT_GATT_CCC_INDICATE);
 }
 
-/* STEP 13 - Define the configuration change callback function for the MYSENSOR characteristic */
-static void mylbsbc_ccc_mysensor_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
+static void garage_right_door_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
-	LOG_INF("my_lbs_mysensor_ccc_cfg_changed value: %d", value);
-	notify_mysensor_enabled = (value == BT_GATT_CCC_NOTIFY);
+	indicate_right_door_enabled = (value == BT_GATT_CCC_INDICATE);
 }
 
-// This function is called when a remote device has acknowledged the indication at its host layer
-static void indicate_cb(struct bt_conn *conn, struct bt_gatt_indicate_params *params, uint8_t err)
+static void garage_gate_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
-	LOG_DBG("Indication %s\n", err != 0U ? "fail" : "success");
+	indicate_gate_enabled = (value == BT_GATT_CCC_INDICATE);
 }
 
-static ssize_t write_led(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf,
-			 uint16_t len, uint16_t offset, uint8_t flags)
+static ssize_t read_left_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+							  void *buf, uint16_t len, uint16_t offset)
 {
-	LOG_DBG("Attribute write, handle: %u, conn: %p", attr->handle, (void *)conn);
+	LOG_DBG("Read left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
 
-	if (len != 1U) {
-		LOG_DBG("Write led: Incorrect data length");
+	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
+	uint8_t val = (uint8_t)state.left_door;
+
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
+}
+
+static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+							   const void *buf, uint16_t len,
+							   uint16_t offset, uint8_t flags)
+{
+	LOG_DBG("Write left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
+
+	if (len != 1U || offset != 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
 	}
 
-	if (offset != 0) {
-		LOG_DBG("Write led: Incorrect data offset");
-		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-	}
-
-	// Read the received value
-	uint8_t val = *((uint8_t *)buf);
-
-	if (val == 0x00 || val == 0x01) {
-		LOG_DBG("Write led: Setting LED to %s", val == 0x01 ? "ON" : "OFF");
-		board_led_set(val);
-	} else {
-		LOG_DBG("Write led: Incorrect value");
+	if (*((const uint8_t *)buf) != 0x01) {
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
 
+	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR);
 	return len;
 }
 
-static ssize_t read_button(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
-			   uint16_t len, uint16_t offset)
+static ssize_t read_right_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+							   void *buf, uint16_t len, uint16_t offset)
 {
-	// get a pointer to button_state which is passed in the BT_GATT_CHARACTERISTIC() and stored in attr->user_data
-	const char *value = attr->user_data;
-
 	LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
 
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(*value));
+	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
+	uint8_t val = (uint8_t)state.right_door;
+
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
 }
 
+static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+								const void *buf, uint16_t len,
+								uint16_t offset, uint8_t flags)
+{
+	LOG_DBG("Attribute write, handle: %u, conn: %p", attr->handle, (void *)conn);
 
-/** @brief LBS Service UUID. */
-#define BT_UUID_LBS_VAL BT_UUID_128_ENCODE(0x00001523, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
+	if (len != 1U || offset != 0) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
+	if (*((const uint8_t *)buf) != 0x01) {
+		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+	}
+	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR);
+	return len;
+}
 
-/** @brief Button Characteristic UUID. */
-#define BT_UUID_LBS_BUTTON_VAL                                                                     \
-	BT_UUID_128_ENCODE(0x00001524, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
+static ssize_t read_gate(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+						 void *buf, uint16_t len, uint16_t offset)
+{
+	LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
 
-/** @brief LED Characteristic UUID. */
-#define BT_UUID_LBS_LED_VAL BT_UUID_128_ENCODE(0x00001525, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
+	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
+	uint8_t val = (uint8_t)state.gate;
 
-/* STEP 11.1 - Assign a UUID to the MYSENSOR characteristic */
-/** @brief LED Characteristic UUID. */
-#define BT_UUID_LBS_MYSENSOR_VAL                                                                   \
-	BT_UUID_128_ENCODE(0x00001526, 0x1212, 0xefde, 0x1523, 0x785feabcd123)
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
+}
 
-#define BT_UUID_LBS BT_UUID_DECLARE_128(BT_UUID_LBS_VAL)
-#define BT_UUID_LBS_BUTTON BT_UUID_DECLARE_128(BT_UUID_LBS_BUTTON_VAL)
-#define BT_UUID_LBS_LED BT_UUID_DECLARE_128(BT_UUID_LBS_LED_VAL)
-/* STEP 11.2 - Convert the array to a generic UUID */
-#define BT_UUID_LBS_MYSENSOR BT_UUID_DECLARE_128(BT_UUID_LBS_MYSENSOR_VAL)
-
-/* LED Button Service Declaration */
 BT_GATT_SERVICE_DEFINE(
-	my_lbs_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_LBS),
-	/* STEP 1 - Modify the Button characteristic declaration to support indication */
-	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_BUTTON, BT_GATT_CHRC_READ | BT_GATT_CHRC_INDICATE,
-			       BT_GATT_PERM_READ, read_button, NULL, &button_pressed_flag),
-	/* STEP 2 - Create and add the Client Characteristic Configuration Descriptor */
-	BT_GATT_CCC(mylbsbc_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	garage_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_GARAGE_SERVICE),
 
-	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_LED, BT_GATT_CHRC_WRITE, BT_GATT_PERM_WRITE_AUTHEN, NULL,
-			       write_led, NULL),
-	/* STEP 12 - Create and add the MYSENSOR characteristic and its CCCD  */
-	BT_GATT_CHARACTERISTIC(BT_UUID_LBS_MYSENSOR, BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_NONE, NULL,
-			       NULL, NULL),
+	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_LEFT_DOOR,
+						   BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
+						   BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_AUTHEN,
+						   read_left_door, write_left_door, NULL),
+	BT_GATT_CCC(garage_left_door_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
-	BT_GATT_CCC(mylbsbc_ccc_mysensor_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_RIGHT_DOOR,
+						   BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
+						   BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_AUTHEN,
+						   read_right_door, write_right_door, NULL),
+	BT_GATT_CCC(garage_right_door_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
+	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_GATE,
+						   BT_GATT_CHRC_READ | BT_GATT_CHRC_INDICATE,
+						   BT_GATT_PERM_READ,
+						   read_gate, NULL, NULL),
+	BT_GATT_CCC(garage_gate_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 );
 
-
-
-/* STEP 5 - Define the function to send indications */
-int my_lbs_send_button_state_indicate(bool button_state)
+static void garage_indicate_cb(struct bt_conn *conn,
+							   struct bt_gatt_indicate_params *params,
+							   uint8_t err)
 {
-	LOG_INF("my_lbs_send_button_state_indicate button_state: %d", button_state);
-	if (!indicate_enabled) {
-		return -EACCES;
-	}
-	ind_params.attr = &my_lbs_svc.attrs[2];
-	ind_params.func = indicate_cb; // A remote device has ACKed at its host layer (ATT ACK)
-	ind_params.destroy = NULL;
-	ind_params.data = &button_state;
-	ind_params.len = sizeof(button_state);
-	return bt_gatt_indicate(NULL, &ind_params);
+	LOG_DBG("Garage indication %s", err != 0U ? "fail" : "success");
 }
 
-/* STEP 14 - Define the function to send notifications for the MYSENSOR characteristic */
-int my_lbs_send_sensor_notify(uint32_t sensor_value)
-{
-	if (!notify_mysensor_enabled) {
-		return -EACCES;
-	}
+/* Static params + value buffers — must outlive the ATT confirmation. */
+static struct bt_gatt_indicate_params garage_left_ind_params;
+static struct bt_gatt_indicate_params garage_right_ind_params;
+static struct bt_gatt_indicate_params garage_gate_ind_params;
+static uint8_t garage_left_ind_val;
+static uint8_t garage_right_ind_val;
+static uint8_t garage_gate_ind_val;
 
-	return bt_gatt_notify(NULL, &my_lbs_svc.attrs[7], &sensor_value, sizeof(sensor_value));
+static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *state)
+{
+	if (indicate_left_door_enabled) {
+		garage_left_ind_val                = (uint8_t)state->left_door;
+		garage_left_ind_params.attr        = &garage_svc.attrs[2];
+		garage_left_ind_params.func        = garage_indicate_cb;
+		garage_left_ind_params.destroy     = NULL;
+		garage_left_ind_params.data        = &garage_left_ind_val;
+		garage_left_ind_params.len         = sizeof(garage_left_ind_val);
+		bt_gatt_indicate(NULL, &garage_left_ind_params);
+	}
+	if (indicate_right_door_enabled) {
+		garage_right_ind_val               = (uint8_t)state->right_door;
+		garage_right_ind_params.attr       = &garage_svc.attrs[5];
+		garage_right_ind_params.func       = garage_indicate_cb;
+		garage_right_ind_params.destroy    = NULL;
+		garage_right_ind_params.data       = &garage_right_ind_val;
+		garage_right_ind_params.len        = sizeof(garage_right_ind_val);
+		bt_gatt_indicate(NULL, &garage_right_ind_params);
+	}
+	if (indicate_gate_enabled) {
+		garage_gate_ind_val                = (uint8_t)state->gate;
+		garage_gate_ind_params.attr        = &garage_svc.attrs[8];
+		garage_gate_ind_params.func        = garage_indicate_cb;
+		garage_gate_ind_params.destroy     = NULL;
+		garage_gate_ind_params.data        = &garage_gate_ind_val;
+		garage_gate_ind_params.len         = sizeof(garage_gate_ind_val);
+		bt_gatt_indicate(NULL, &garage_gate_ind_params);
+	}
 }
+
+#endif /* CONFIG_COPRO_DEVICE_CONTROL */
 
 int ble_server_start(void)
 {
@@ -340,6 +348,10 @@ int ble_server_start(void)
 
 	k_work_init(&adv_work, adv_work_handler);
 	advertising_start();
+
+#if defined(CONFIG_COPRO_DEVICE_CONTROL)
+	device_control_set_state_cb(garage_doors_notify_state);
+#endif
 
 	return 0;
 }
