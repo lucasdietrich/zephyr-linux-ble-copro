@@ -170,6 +170,11 @@ static int try_connect(scli_t *s)
 	s->state = STREAM_CONNECTED;
 	LED_ON();
 
+	/* Discard messages that accumulated while disconnected – they are stale. */
+	for (int i = 0; i < s->channels_count; i++) {
+		k_msgq_purge(s->channels[i].tx_msgq);
+	}
+
 	LOG_INF("Connected to %s:%d", CONFIG_COPRO_STREAM_HOST, CONFIG_COPRO_STREAM_PORT);
 
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
