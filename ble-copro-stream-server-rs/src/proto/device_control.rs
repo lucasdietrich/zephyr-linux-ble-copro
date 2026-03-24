@@ -1,4 +1,4 @@
-use crate::{stream_channel::StreamChannelError, StreamChannelHandler};
+use crate::{StreamChannelHandler, StreamChannelIndication, stream_channel::StreamChannelError};
 
 pub const CHANNEL_NAME: &str = "device-control";
 
@@ -12,7 +12,7 @@ pub const CHANNEL_NAME: &str = "device-control";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DeviceCtrlCmd {
-    OpenLeftGarageDoor  = 0x01,
+    OpenLeftGarageDoor = 0x01,
     OpenRightGarageDoor = 0x02,
 }
 
@@ -53,23 +53,22 @@ impl StreamChannelHandler for DeviceControlHandler {
 /// Per-door / gate position state.
 ///
 /// Wire encoding: 1 byte.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum DoorState {
-    Closed  = 0x00,
-    Open    = 0x01,
-    Opening = 0x02,
-    Closing = 0x03,
+    #[default]
+    Closed = 0x00,
+    Open = 0x01,
     Unknown = 0xFF,
 }
 
 /// State of all three garage doors / gate.
 ///
 /// Wire layout (3 bytes): left_door, gate, right_door.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GarageDoorsState {
-    pub left_door:  DoorState,
-    pub gate:       DoorState,
+    pub left_door: DoorState,
+    pub gate: DoorState,
     pub right_door: DoorState,
 }
 
@@ -110,8 +109,18 @@ impl DeviceCtrlStateMsg {
     pub fn to_bytes(&self) -> Vec<u8> {
         // Largest current payload: 4 bytes
         let mut buf = vec![0u8; 4];
-        let n = self.serialize(&mut buf).expect("buffer is always large enough");
+        let n = self
+            .serialize(&mut buf)
+            .expect("buffer is always large enough");
         buf.truncate(n);
         buf
+    }
+}
+
+impl StreamChannelIndication for DeviceCtrlStateMsg {
+    const CHANNEL_ID: u32 = DeviceControlHandler::CHANNEL_ID;
+
+    fn serialize_indication(&self) -> Vec<u8> {
+        self.to_bytes()
     }
 }

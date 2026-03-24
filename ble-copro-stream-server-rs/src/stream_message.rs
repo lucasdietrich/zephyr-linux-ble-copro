@@ -1,6 +1,9 @@
 use crate::{
-    ble_control::BleControlPayload, control_channel::ControlMessage,
-    device_control::DeviceCtrlCommandMsg, linky::LinkyTicRecord, xiaomi::XiaomiRecord,
+    ble_control::BleControlPayload,
+    control_channel::ControlMessage,
+    device_control::{DeviceCtrlCommandMsg, DeviceCtrlStateMsg},
+    linky::LinkyTicRecord,
+    xiaomi::XiaomiRecord,
 };
 
 #[derive(Debug)]
@@ -25,4 +28,9 @@ pub enum ChannelMessage {
     BleControl(BleControlPayload),
     Control(ControlMessage),
     DeviceControl(DeviceCtrlCommandMsg),
+}
+
+#[derive(Debug)]
+pub enum ChannelIndication {
+    DeviceStateUpdate(DeviceCtrlStateMsg),
 }

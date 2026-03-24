@@ -83,14 +83,21 @@ static void device_control_rx_thread(void *a, void *b, void *c)
 
 		switch (msg.type) {
 		case DEVICE_CTRL_STATE_TYPE_GARAGE_DOORS: {
-			garage_state = msg.payload.garage_doors;
+			const device_ctrl_garage_doors_state_t *new = &msg.payload.garage_doors;
+			uint8_t changed = 0;
 
-			LOG_DBG("Garage state update: left=%d gate=%d right=%d",
+			if (new->left_door  != garage_state.left_door)  changed |= DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR;
+			if (new->right_door != garage_state.right_door) changed |= DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR;
+			if (new->gate       != garage_state.gate)       changed |= DEVICE_CTRL_GARAGE_CHANGED_GATE;
+
+			garage_state = *new;
+
+			LOG_DBG("Garage state update: left=%d gate=%d right=%d (changed=0x%02x)",
 					garage_state.left_door, garage_state.gate,
-					garage_state.right_door);
+					garage_state.right_door, changed);
 
-			if (state_cb != NULL) {
-				state_cb(&msg.payload.garage_doors);
+			if (state_cb != NULL && changed) {
+				state_cb(new, changed);
 			}
 			break;
 		}

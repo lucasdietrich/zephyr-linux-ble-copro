@@ -28,6 +28,7 @@ typedef struct {
 typedef struct {
 	int sock;
 	scli_state_t state;
+	stream_client_conn_cb_t conn_cb;
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
 	/* +1 for the RX-disconnect signal slot */
 	struct k_poll_event poll_events[CONFIG_COPRO_STREAM_CHANNELS_COUNT + 1];
@@ -138,6 +139,16 @@ int stream_client_start(void)
 	return 0;
 }
 
+bool stream_client_is_connected(void)
+{
+	return scli.state == STREAM_CONNECTED;
+}
+
+void stream_client_set_conn_cb(stream_client_conn_cb_t cb)
+{
+	scli.conn_cb = cb;
+}
+
 static int try_connect(scli_t *s)
 {
 	int ret, sock;
@@ -177,6 +188,10 @@ static int try_connect(scli_t *s)
 
 	LOG_INF("Connected to %s:%d", CONFIG_COPRO_STREAM_HOST, CONFIG_COPRO_STREAM_PORT);
 
+	if (s->conn_cb) {
+		s->conn_cb(true);
+	}
+
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
 	/* Reset stale disconnect signal, then wake the RX thread */
 	k_poll_signal_reset(&s->rx_disconnect_signal);
@@ -191,6 +206,8 @@ static int disconnect(scli_t *s)
 {
 	__ASSERT_NO_MSG(s);
 
+	bool notify = false;
+
 	k_mutex_lock(&s->conn_mutex, K_FOREVER);
 	if (s->sock >= 0) {
 		close(s->sock);
@@ -198,8 +215,13 @@ static int disconnect(scli_t *s)
 		s->state = STREAM_DISCONNECTED;
 		LED_OFF();
 		LOG_INF("Disconnected");
+		notify = true;
 	}
 	k_mutex_unlock(&s->conn_mutex);
+
+	if (notify && s->conn_cb) {
+		s->conn_cb(false);
+	}
 
 	return 0;
 }

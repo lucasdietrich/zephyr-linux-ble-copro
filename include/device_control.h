@@ -47,8 +47,6 @@ typedef struct __packed {
 typedef enum __packed {
 	DEVICE_CTRL_DOOR_CLOSED  = 0x00,
 	DEVICE_CTRL_DOOR_OPEN    = 0x01,
-	DEVICE_CTRL_DOOR_OPENING = 0x02,
-	DEVICE_CTRL_DOOR_CLOSING = 0x03,
 	DEVICE_CTRL_DOOR_UNKNOWN = 0xFF,
 } device_ctrl_door_state_t;
 
@@ -109,13 +107,23 @@ extern struct k_msgq device_control_rx_msgq;
  *---------------------------------------------------------------------------*/
 
 /**
+ * @brief Bitmask flags indicating which fields changed in a garage-doors
+ *        state update.  Passed as @p changed to @ref device_ctrl_state_cb_t.
+ */
+#define DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR  BIT(0)
+#define DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR BIT(1)
+#define DEVICE_CTRL_GARAGE_CHANGED_GATE       BIT(2)
+
+/**
  * @brief Callback invoked (from the RX thread) whenever the garage-doors
  *        state is updated.
  *
- * The pointer is valid only for the duration of the call; copy the
- * contents if you need to keep them.
+ * @param state   New state; valid only for the duration of the call.
+ * @param changed Bitmask of @ref DEVICE_CTRL_GARAGE_CHANGED_* flags
+ *                indicating which fields differ from the previous state.
  */
-typedef void (*device_ctrl_state_cb_t)(const device_ctrl_garage_doors_state_t *state);
+typedef void (*device_ctrl_state_cb_t)(const device_ctrl_garage_doors_state_t *state,
+									   uint8_t changed);
 
 /*---------------------------------------------------------------------------
  * API

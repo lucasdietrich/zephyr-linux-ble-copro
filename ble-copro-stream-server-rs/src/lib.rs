@@ -18,3 +18,9 @@ pub trait StreamChannelHandler {
 
     fn parse_message(data: &[u8]) -> Result<Self::Message, StreamChannelError>;
 }
+
+pub trait StreamChannelIndication {
+    const CHANNEL_ID: u32;
+
+    fn serialize_indication(&self) -> Vec<u8>;
+}

@@ -76,6 +76,22 @@ static void advertising_start(void)
 	k_work_submit(&adv_work);
 }
 
+static uint8_t firmware_flags;
+static void firmware_flags_notify(void);
+
+#if defined(CONFIG_COPRO_DEVICE_CONTROL)
+static void stream_conn_cb(bool connected)
+{
+	if (connected) {
+		firmware_flags |= BLE_FLAG_SERVER_CONNECTED;
+	} else {
+		firmware_flags &= ~BLE_FLAG_SERVER_CONNECTED;
+	}
+	firmware_flags_notify();
+}
+#endif
+
+
 void on_connected(struct bt_conn *conn, uint8_t err)
 {
     if (err) {
@@ -163,6 +179,7 @@ static struct bt_conn_auth_cb conn_auth_callbacks = {
 static bool indicate_left_door_enabled;
 static bool indicate_right_door_enabled;
 static bool indicate_gate_enabled;
+static bool notify_flags_enabled;
 
 static void garage_left_door_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
@@ -177,6 +194,11 @@ static void garage_right_door_ccc_changed(const struct bt_gatt_attr *attr, uint1
 static void garage_gate_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
 	indicate_gate_enabled = (value == BT_GATT_CCC_INDICATE);
+}
+
+static void garage_flags_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	notify_flags_enabled = (value == BT_GATT_CCC_NOTIFY);
 }
 
 static ssize_t read_left_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -246,6 +268,15 @@ static ssize_t read_gate(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
 }
 
+static ssize_t read_flags(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+					  void *buf, uint16_t len, uint16_t offset)
+{
+	LOG_DBG("Read firmware flags, handle: %u, conn: %p", attr->handle, (void *)conn);
+
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &firmware_flags,
+							 sizeof(firmware_flags));
+}
+
 BT_GATT_SERVICE_DEFINE(
 	garage_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_GARAGE_SERVICE),
 
@@ -266,6 +297,12 @@ BT_GATT_SERVICE_DEFINE(
 						   BT_GATT_PERM_READ,
 						   read_gate, NULL, NULL),
 	BT_GATT_CCC(garage_gate_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+
+	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_FLAGS,
+						   BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+						   BT_GATT_PERM_READ,
+						   read_flags, NULL, NULL),
+	BT_GATT_CCC(garage_flags_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 );
 
 static void garage_indicate_cb(struct bt_conn *conn,
@@ -283,9 +320,11 @@ static uint8_t garage_left_ind_val;
 static uint8_t garage_right_ind_val;
 static uint8_t garage_gate_ind_val;
 
-static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *state)
+/* Sends BLE indications for whichever channels are flagged in @changed. */
+static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *state,
+									  uint8_t changed)
 {
-	if (indicate_left_door_enabled) {
+	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR) && indicate_left_door_enabled) {
 		garage_left_ind_val                = (uint8_t)state->left_door;
 		garage_left_ind_params.attr        = &garage_svc.attrs[2];
 		garage_left_ind_params.func        = garage_indicate_cb;
@@ -294,7 +333,7 @@ static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *st
 		garage_left_ind_params.len         = sizeof(garage_left_ind_val);
 		bt_gatt_indicate(NULL, &garage_left_ind_params);
 	}
-	if (indicate_right_door_enabled) {
+	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR) && indicate_right_door_enabled) {
 		garage_right_ind_val               = (uint8_t)state->right_door;
 		garage_right_ind_params.attr       = &garage_svc.attrs[5];
 		garage_right_ind_params.func       = garage_indicate_cb;
@@ -303,7 +342,7 @@ static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *st
 		garage_right_ind_params.len        = sizeof(garage_right_ind_val);
 		bt_gatt_indicate(NULL, &garage_right_ind_params);
 	}
-	if (indicate_gate_enabled) {
+	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_GATE) && indicate_gate_enabled) {
 		garage_gate_ind_val                = (uint8_t)state->gate;
 		garage_gate_ind_params.attr        = &garage_svc.attrs[8];
 		garage_gate_ind_params.func        = garage_indicate_cb;
@@ -312,6 +351,21 @@ static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *st
 		garage_gate_ind_params.len         = sizeof(garage_gate_ind_val);
 		bt_gatt_indicate(NULL, &garage_gate_ind_params);
 	}
+}
+
+/* Registered with device_control_set_state_cb(). Forwards the pre-computed
+ * changed bitmask directly to the BLE indication function. */
+static void garage_state_cb(const device_ctrl_garage_doors_state_t *state, uint8_t changed)
+{
+	garage_doors_notify_state(state, changed);
+}
+
+static void firmware_flags_notify(void)
+{
+	if (!notify_flags_enabled) {
+		return;
+	}
+	bt_gatt_notify(NULL, &garage_svc.attrs[11], &firmware_flags, sizeof(firmware_flags));
 }
 
 #endif /* CONFIG_COPRO_DEVICE_CONTROL */
@@ -350,7 +404,8 @@ int ble_server_start(void)
 	advertising_start();
 
 #if defined(CONFIG_COPRO_DEVICE_CONTROL)
-	device_control_set_state_cb(garage_doors_notify_state);
+	device_control_set_state_cb(garage_state_cb);
+	stream_client_set_conn_cb(stream_conn_cb);
 #endif
 
 	return 0;

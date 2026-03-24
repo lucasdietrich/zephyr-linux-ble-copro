@@ -17,14 +17,17 @@
  * Attribute layout:
  *  0  – primary service declaration
  *  1  – left door characteristic declaration
- *  2  – left door characteristic value       ← notify target
+ *  2  – left door characteristic value       ← indicate target
  *  3  – left door CCC descriptor
  *  4  – right door characteristic declaration
- *  5  – right door characteristic value      ← notify target
+ *  5  – right door characteristic value      ← indicate target
  *  6  – right door CCC descriptor
  *  7  – gate characteristic declaration
- *  8  – gate characteristic value            ← notify target
+ *  8  – gate characteristic value            ← indicate target
  *  9  – gate CCC descriptor
+ *  10 – firmware flags characteristic declaration
+ *  11 – firmware flags characteristic value  ← notify target
+ *  12 – firmware flags CCC descriptor
  * ---------------------------------------------------------------------------*/
 
 #define BT_UUID_GARAGE_SERVICE_VAL \
@@ -35,11 +38,17 @@
 	BT_UUID_128_ENCODE(0x539f0002, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
 #define BT_UUID_GARAGE_GATE_VAL \
 	BT_UUID_128_ENCODE(0x539f0003, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
+#define BT_UUID_GARAGE_FLAGS_VAL \
+	BT_UUID_128_ENCODE(0x539f0004, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
 
 #define BT_UUID_GARAGE_SERVICE    BT_UUID_DECLARE_128(BT_UUID_GARAGE_SERVICE_VAL)
 #define BT_UUID_GARAGE_LEFT_DOOR  BT_UUID_DECLARE_128(BT_UUID_GARAGE_LEFT_DOOR_VAL)
 #define BT_UUID_GARAGE_RIGHT_DOOR BT_UUID_DECLARE_128(BT_UUID_GARAGE_RIGHT_DOOR_VAL)
 #define BT_UUID_GARAGE_GATE       BT_UUID_DECLARE_128(BT_UUID_GARAGE_GATE_VAL)
+#define BT_UUID_GARAGE_FLAGS      BT_UUID_DECLARE_128(BT_UUID_GARAGE_FLAGS_VAL)
+
+/* Firmware status flags bit definitions (firmware flags characteristic) */
+#define BLE_FLAG_SERVER_CONNECTED BIT(0) /**< bit 0: TCP stream server is connected */
 
 int ble_server_start(void);
 
