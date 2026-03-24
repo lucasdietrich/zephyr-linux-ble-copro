@@ -76,6 +76,34 @@ static void advertising_start(void)
 	k_work_submit(&adv_work);
 }
 
+#if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
+static void idle_timeout_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(idle_timeout_work, idle_timeout_handler);
+
+static void idle_timeout_handler(struct k_work *work)
+{
+	if (my_conn) {
+		LOG_WRN("BLE idle timeout (%ds), disconnecting",
+				CONFIG_COPRO_BLE_IDLE_TIMEOUT_S);
+		bt_conn_disconnect(my_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+	}
+}
+
+static void idle_timer_reset(void)
+{
+	k_work_reschedule(&idle_timeout_work,
+					  K_SECONDS(CONFIG_COPRO_BLE_IDLE_TIMEOUT_S));
+}
+
+static void idle_timer_cancel(void)
+{
+	k_work_cancel_delayable(&idle_timeout_work);
+}
+#else
+static inline void idle_timer_reset(void)  {}
+static inline void idle_timer_cancel(void) {}
+#endif
+
 static uint8_t firmware_flags;
 static void firmware_flags_notify(void);
 
@@ -104,12 +132,14 @@ void on_connected(struct bt_conn *conn, uint8_t err)
     // TODO
     board_led_off();
 	bt_ctrl_msg_send_connected(bt_conn_get_dst(conn));
+	idle_timer_reset();
 }
 
 void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
     LOG_INF("Disconnected. Reason %d", reason);
     bt_conn_unref(my_conn);
+	idle_timer_cancel();
 
     // TODO
     board_led_on();
@@ -136,6 +166,7 @@ void on_security_changed(struct bt_conn *conn,
 		if (level == BT_SECURITY_L4) {
 			bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), true);
 		}
+		idle_timer_reset();
 	} else {
 		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
 			err);
@@ -227,6 +258,7 @@ static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *
 	}
 
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR);
+	idle_timer_reset();
 	return len;
 }
 
@@ -254,6 +286,7 @@ static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr 
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR);
+	idle_timer_reset();
 	return len;
 }
 

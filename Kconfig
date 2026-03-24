@@ -178,7 +178,13 @@ menuconfig COPRO_BLE_SERVER
 
 if COPRO_BLE_SERVER
 
-# TODO
+config COPRO_BLE_IDLE_TIMEOUT_S
+    int "BLE idle connection timeout (seconds)"
+    default 15
+    help
+      Disconnect a BLE connection that has been idle for this many seconds.
+      Idle means no authenticated GATT write or security-level upgrade has
+      been received. Set to 0 to disable the timeout entirely.
 
 endif # COPRO_BLE_SERVER
 
