@@ -403,6 +403,9 @@ int rx_thread(void *arg0, void *arg1, void *arg2)
 							LOG_WRN("RX [%s]: queue full, dropping message",
 									scli.channels[i].name);
 						}
+					} else {
+						LOG_WRN("RX [%s]: no RX queue configured, dropping message",
+								scli.channels[i].name);
 					}
 					dispatched = true;
 					break;
