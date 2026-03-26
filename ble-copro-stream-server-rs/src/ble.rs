@@ -72,6 +72,13 @@ impl BleAddress {
     pub fn mac_manufacturer_part(&self) -> String {
         format!("{:02x}{:02x}{:02x}", self.mac[3], self.mac[4], self.mac[5])
     }
+
+    pub(crate) fn serialize(&self) -> [u8; 7] {
+        let mut data = [0u8; 7];
+        data[0] = self.ble_type as u8;
+        data[1..7].copy_from_slice(&self.mac);
+        data
+    }
 }
 
 impl Display for BleAddress {

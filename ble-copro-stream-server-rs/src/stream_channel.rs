@@ -83,7 +83,7 @@ impl StreamChannel {
 
     pub async fn send_indication<I: StreamChannelIndication>(
         &mut self,
-        indication: &I,
+        indication: I,
     ) -> Result<(), StreamChannelError> {
         let data = indication.serialize_indication();
         let header = MessageHeader::new(I::CHANNEL_ID, data.len() as u16);

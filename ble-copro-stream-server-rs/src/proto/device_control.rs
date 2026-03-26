@@ -1,4 +1,7 @@
-use crate::{StreamChannelHandler, StreamChannelIndication, stream_channel::StreamChannelError};
+use crate::{
+    ble::BleAddress, stream_channel::StreamChannelError, StreamChannelHandler,
+    StreamChannelIndication,
+};
 
 pub const CHANNEL_NAME: &str = "device-control";
 
@@ -19,10 +22,12 @@ pub enum DeviceCtrlCmd {
 /// Parsed command message (device → server).
 ///
 /// Wire layout:
-///   - byte 0: command type (`DeviceCtrlCmd`)
+///   - byte 0:    command type (`DeviceCtrlCmd`)
+///   - bytes 1-7: BLE address (1 byte address type + 6 bytes MAC)
 #[derive(Debug, Clone)]
 pub struct DeviceCtrlCommandMsg {
     pub cmd: DeviceCtrlCmd,
+    pub ble_addr: BleAddress,
 }
 
 pub struct DeviceControlHandler;
@@ -32,7 +37,7 @@ impl StreamChannelHandler for DeviceControlHandler {
     type Message = DeviceCtrlCommandMsg;
 
     fn parse_message(data: &[u8]) -> Result<Self::Message, StreamChannelError> {
-        if data.is_empty() {
+        if data.len() < 8 {
             return Err(StreamChannelError::InvalidMessageLength);
         }
 
@@ -42,7 +47,10 @@ impl StreamChannelHandler for DeviceControlHandler {
             _ => return Err(StreamChannelError::InvalidMessageData),
         };
 
-        Ok(DeviceCtrlCommandMsg { cmd })
+        let ble_addr =
+            BleAddress::from_raw(&data[1..8]).ok_or(StreamChannelError::InvalidMessageData)?;
+
+        Ok(DeviceCtrlCommandMsg { cmd, ble_addr })
     }
 }
 

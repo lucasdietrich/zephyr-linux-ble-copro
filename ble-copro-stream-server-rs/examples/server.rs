@@ -53,7 +53,7 @@ async fn main() {
     loop {
         let mut channel = server.accept().await.expect("Failed to accept connection");
 
-        channel.send_indication(&garage_controller.get_initial_state()).await.expect("Failed to send initial state");
+        channel.send_indication(garage_controller.get_initial_state()).await.expect("Failed to send initial state");
 
         loop {
             match channel.next().await {
@@ -72,7 +72,7 @@ async fn main() {
                         if let Some(new_state) = garage_controller.handle_command(cmd.cmd) {
                             println!("Updated garage door state: {:?}", new_state);
                             channel
-                                .send_indication(&new_state)
+                                .send_indication(new_state)
                                 .await
                                 .expect("Failed to send indication");
                         }

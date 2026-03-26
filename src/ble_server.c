@@ -170,6 +170,7 @@ void on_security_changed(struct bt_conn *conn,
 	} else {
 		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
 			err);
+		bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), false);
 	}
 }
 
@@ -257,7 +258,9 @@ static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
 
-	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR);
+	struct bt_conn_info info;
+	bt_conn_get_info(conn, &info);
+	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR, info.le.dst);
 	idle_timer_reset();
 	return len;
 }
@@ -285,7 +288,9 @@ static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr 
 	if (*((const uint8_t *)buf) != 0x01) {
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
-	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR);
+	struct bt_conn_info info;
+	bt_conn_get_info(conn, &info);
+	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR, info.le.dst);
 	idle_timer_reset();
 	return len;
 }
@@ -403,6 +408,13 @@ static void firmware_flags_notify(void)
 
 #endif /* CONFIG_COPRO_DEVICE_CONTROL */
 
+void iter_bond_cb(const struct bt_bond_info *info, void *user_data)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_to_str(&info->addr, addr, sizeof(addr));
+	printk("Bonded device: %s\n", addr);
+}
+
 int ble_server_start(void)
 {
 	int ret;
@@ -432,6 +444,8 @@ int ble_server_start(void)
 		LOG_INF("Failed to register authorization callbacks.\n");
 		return -1;
 	}
+
+	bt_foreach_bond(BT_ID_DEFAULT, iter_bond_cb, NULL);
 
 	k_work_init(&adv_work, adv_work_handler);
 	advertising_start();

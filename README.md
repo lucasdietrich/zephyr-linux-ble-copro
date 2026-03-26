@@ -156,7 +156,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## TODOs
 
-- Add keep-alive messages for the TCP connection.
+- **Add BLE addr with DeviceControl info (for identification of the source of the command)**
+- **Reset or pause the idle timeout when a pairing operation is in progress**
+- ~~Add keep-alive messages for the TCP connection.~~
 - Use a *ring buffer* API instead of the msgq: <https://docs.zephyrproject.org/latest/doxygen/html/group__ring__buffer__apis.html#ga6c7e76e3ca798e994f738d114cb9a7e3>
 
 ## Net diag

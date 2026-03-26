@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -28,30 +30,36 @@ K_MSGQ_DEFINE(device_control_rx_msgq,
  * @brief Serialize a device control command into a byte buffer.
  *
  * Wire layout:
- *   - byte 0: command type (@ref device_ctrl_cmd_t)
+ *   - byte 0:    command type (@ref device_ctrl_cmd_t)
+ *   - bytes 1-7: BLE address (1 byte address type + 6 bytes MAC)
  *
- * @param cmd  Command to serialize.
- * @param buf  Destination buffer.
- * @param len  Buffer size; must be >= 1.
- * @return Number of bytes written (1), or -EINVAL if the buffer is too small.
+ * @param cmd      Command to serialize.
+ * @param ble_addr BLE address of the requesting client.
+ * @param buf      Destination buffer.
+ * @param len      Buffer size; must be >= 8.
+ * @return Number of bytes written (8), or -EINVAL if the buffer is too small.
  */
-static int device_ctrl_command_serialize(device_ctrl_cmd_t cmd, uint8_t *buf, size_t len)
+static int device_ctrl_command_serialize(device_ctrl_cmd_t cmd,
+										 const bt_addr_le_t *ble_addr,
+										 uint8_t *buf, size_t len)
 {
-	if (len < 1u) {
+	if (len < 8u) {
 		return -EINVAL;
 	}
 
 	buf[0] = (uint8_t)cmd;
+	buf[1] = ble_addr->type;
+	memcpy(&buf[2], ble_addr->a.val, 6);
 
-	return 1;
+	return 8;
 }
 
-int device_control_send_cmd(device_ctrl_cmd_t cmd)
+int device_control_send_cmd(device_ctrl_cmd_t cmd, const bt_addr_le_t *ble_addr)
 {
 	LOG_DBG("Sending command: 0x%02x", (unsigned int)cmd);
 	uint8_t buf[sizeof(device_ctrl_command_msg_t)];
 
-	int ret = device_ctrl_command_serialize(cmd, buf, sizeof(buf));
+	int ret = device_ctrl_command_serialize(cmd, ble_addr, buf, sizeof(buf));
 
 	if (ret < 0) {
 		LOG_ERR("Failed to serialize command 0x%02x: %d", (unsigned int)cmd, ret);

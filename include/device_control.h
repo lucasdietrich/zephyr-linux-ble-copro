@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include <zephyr/bluetooth/addr.h>
 #include <zephyr/kernel.h>
 
 /* Stream channel registration */
@@ -31,10 +32,13 @@ typedef enum __packed {
  * @brief Command message transmitted over the stream channel (TX wire format).
  *
  * Wire layout:
- *   - 1 byte: command type (@ref device_ctrl_cmd_t)
+ *   - 1 byte:  command type  (@ref device_ctrl_cmd_t)
+ *   - 7 bytes: BLE address of the requesting client (1 byte address type +
+ *              6 bytes MAC, little-endian — same layout as @ref bt_addr_le_t)
  */
 typedef struct __packed {
 	device_ctrl_cmd_t cmd;
+	bt_addr_le_t      ble_addr; /**< BLE address of the requesting client */
 } device_ctrl_command_msg_t;
 
 /*---------------------------------------------------------------------------
@@ -134,10 +138,11 @@ typedef void (*device_ctrl_state_cb_t)(const device_ctrl_garage_doors_state_t *s
  *
  * Thread-safe, non-blocking.  Returns -ENOMSG if the TX queue is full.
  *
- * @param cmd Command to send.
+ * @param cmd      Command to send.
+ * @param ble_addr BLE address of the client that triggered the command.
  * @return 0 on success, negative errno on failure.
  */
-int device_control_send_cmd(device_ctrl_cmd_t cmd);
+int device_control_send_cmd(device_ctrl_cmd_t cmd, const bt_addr_le_t *ble_addr);
 
 /**
  * @brief Return the most recently received garage-doors state.

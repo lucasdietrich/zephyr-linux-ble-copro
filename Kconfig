@@ -180,7 +180,7 @@ if COPRO_BLE_SERVER
 
 config COPRO_BLE_IDLE_TIMEOUT_S
     int "BLE idle connection timeout (seconds)"
-    default 15
+    default 30
     help
       Disconnect a BLE connection that has been idle for this many seconds.
       Idle means no authenticated GATT write or security-level upgrade has
