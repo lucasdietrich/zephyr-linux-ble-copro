@@ -524,22 +524,21 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 	}
 }
 
+static int bt_ctrl_msg_enqueue(struct ble_ctrl_tx_msg *msg)
+{
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(msg, buf, sizeof(buf));
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+}
+
 int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
 {
 	struct ble_ctrl_tx_msg msg = {
 		.cmd = BLE_CTRL_EVENT_PAIRING_CODE,
 		.addr = *addr,
-		.param = {
-			.pairing_code = {
-				.passkey = passkey,
-			},
-		},
+		.param = { .pairing_code = { .passkey = passkey } },
 	};
-
-	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
-	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
-
-	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+	return bt_ctrl_msg_enqueue(&msg);
 }
 
 int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
@@ -547,17 +546,9 @@ int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
 	struct ble_ctrl_tx_msg msg = {
 		.cmd = BLE_CTRL_EVENT_PAIRING_RESULT,
 		.addr = *addr,
-		.param = {
-			.pairing_result = {
-				.success = success,
-			},
-		},
+		.param = { .pairing_result = { .success = success } },
 	};
-
-	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
-	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
-
-	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+	return bt_ctrl_msg_enqueue(&msg);
 }
 
 int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
@@ -566,11 +557,7 @@ int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
 		.cmd = BLE_CTRL_EVENT_CONNECTED,
 		.addr = *addr,
 	};
-
-	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
-	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
-
-	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+	return bt_ctrl_msg_enqueue(&msg);
 }
 
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr)
@@ -578,17 +565,8 @@ int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr)
 	struct ble_ctrl_tx_msg msg = {
 		.cmd = BLE_CTRL_EVENT_DISCONNECTED,
 		.addr = *addr,
-		.param = {
-			.pairing_result = {
-				.success = false,
-			},
-		},
 	};
-
-	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
-	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
-
-	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+	return bt_ctrl_msg_enqueue(&msg);
 }
 
 int bt_ctrl_msg_send_all_bonds_removed(void)
@@ -596,9 +574,5 @@ int bt_ctrl_msg_send_all_bonds_removed(void)
 	struct ble_ctrl_tx_msg msg = {
 		.cmd = BLE_CTRL_EVENT_ALL_BONDS_REMOVED,
 	};
-
-	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
-	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
-
-	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+	return bt_ctrl_msg_enqueue(&msg);
 }
