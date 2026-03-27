@@ -29,8 +29,44 @@ LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_DBG);
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
-struct bt_conn *my_conn = NULL;
+struct conn_slot {
+	struct bt_conn *conn;
+#if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
+	struct k_work_delayable idle_work;
+#endif
+};
+
+static struct conn_slot conn_slots[CONFIG_BT_MAX_CONN];
 static struct k_work adv_work;
+
+static struct conn_slot *conn_slot_find_free(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
+		if (!conn_slots[i].conn) {
+			return &conn_slots[i];
+		}
+	}
+	return NULL;
+}
+
+static struct conn_slot *conn_slot_find(struct bt_conn *conn)
+{
+	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
+		if (conn_slots[i].conn == conn) {
+			return &conn_slots[i];
+		}
+	}
+	return NULL;
+}
+
+static int conn_count(void)
+{
+	int count = 0;
+	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
+		if (conn_slots[i].conn) count++;
+	}
+	return count;
+}
 
 #define COMPANY_ID_CODE 0xFFFF
 typedef struct adv_mfg_data {
@@ -68,6 +104,9 @@ static void adv_work_handler(struct k_work *work)
 {
 	int err = bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 
+	if (err == -EALREADY) {
+		return;
+	}
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
 		return;
@@ -82,31 +121,31 @@ static void advertising_start(void)
 }
 
 #if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
-static void idle_timeout_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(idle_timeout_work, idle_timeout_handler);
-
 static void idle_timeout_handler(struct k_work *work)
 {
-	if (my_conn) {
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct conn_slot *slot = CONTAINER_OF(dwork, struct conn_slot, idle_work);
+
+	if (slot->conn) {
 		LOG_WRN("BLE idle timeout (%ds), disconnecting",
 				CONFIG_COPRO_BLE_IDLE_TIMEOUT_S);
-		bt_conn_disconnect(my_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		bt_conn_disconnect(slot->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	}
 }
 
-static void idle_timer_reset(void)
+static void idle_timer_reset(struct conn_slot *slot)
 {
-	k_work_reschedule(&idle_timeout_work,
+	k_work_reschedule(&slot->idle_work,
 					  K_SECONDS(CONFIG_COPRO_BLE_IDLE_TIMEOUT_S));
 }
 
-static void idle_timer_cancel(void)
+static void idle_timer_cancel(struct conn_slot *slot)
 {
-	k_work_cancel_delayable(&idle_timeout_work);
+	k_work_cancel_delayable(&slot->idle_work);
 }
 #else
-static inline void idle_timer_reset(void)  {}
-static inline void idle_timer_cancel(void) {}
+static inline void idle_timer_reset(struct conn_slot *slot) { (void)slot; }
+static inline void idle_timer_cancel(struct conn_slot *slot) { (void)slot; }
 #endif
 
 static uint8_t firmware_flags;
@@ -127,28 +166,44 @@ static void stream_conn_cb(bool connected)
 
 void on_connected(struct bt_conn *conn, uint8_t err)
 {
-    if (err) {
-        LOG_ERR("Connection error %d", err);
-        return;
-    }
-    LOG_INF("Connected");
-    my_conn = bt_conn_ref(conn);
+	if (err) {
+		LOG_ERR("Connection error %d", err);
+		return;
+	}
+	LOG_INF("Connected");
 
-    // TODO
-    board_led_off();
+	struct conn_slot *slot = conn_slot_find_free();
+	if (!slot) {
+		LOG_ERR("No free connection slot, dropping connection");
+		bt_conn_disconnect(conn, BT_HCI_ERR_CONN_LIMIT_EXCEEDED);
+		return;
+	}
+	slot->conn = bt_conn_ref(conn);
+
+	if (conn_count() == 1) {
+		board_led_off();
+	}
 	bt_ctrl_msg_send_connected(bt_conn_get_dst(conn));
-	idle_timer_reset();
+	idle_timer_reset(slot);
+	advertising_start();
 }
 
 void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    LOG_INF("Disconnected. Reason %d", reason);
-    bt_conn_unref(my_conn);
-	idle_timer_cancel();
+	LOG_INF("Disconnected. Reason %d", reason);
 
-    // TODO
-    board_led_on();
+	struct conn_slot *slot = conn_slot_find(conn);
+	if (slot) {
+		idle_timer_cancel(slot);
+		bt_conn_unref(slot->conn);
+		slot->conn = NULL;
+	}
+
 	bt_ctrl_msg_send_disconnected(bt_conn_get_dst(conn));
+
+	if (conn_count() == 0) {
+		board_led_on();
+	}
 }
 
 static void on_recycled(void)
@@ -171,7 +226,8 @@ void on_security_changed(struct bt_conn *conn,
 		if (level == BT_SECURITY_L4) {
 			bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), true);
 		}
-		idle_timer_reset();
+		struct conn_slot *slot = conn_slot_find(conn);
+		if (slot) idle_timer_reset(slot);
 	} else {
 		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
 			err);
@@ -266,7 +322,8 @@ static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *
 	struct bt_conn_info info;
 	bt_conn_get_info(conn, &info);
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR, info.le.dst);
-	idle_timer_reset();
+	struct conn_slot *slot = conn_slot_find(conn);
+	if (slot) idle_timer_reset(slot);
 	return len;
 }
 
@@ -296,7 +353,8 @@ static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr 
 	struct bt_conn_info info;
 	bt_conn_get_info(conn, &info);
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR, info.le.dst);
-	idle_timer_reset();
+	struct conn_slot *lslot = conn_slot_find(conn);
+	if (lslot) idle_timer_reset(lslot);
 	return len;
 }
 
@@ -484,6 +542,13 @@ int ble_server_start(void)
 	k_thread_start(ble_ctrl_rx_tid);
 
 	k_work_init(&adv_work, adv_work_handler);
+
+#if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
+	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
+		k_work_init_delayable(&conn_slots[i].idle_work, idle_timeout_handler);
+	}
+#endif
+
 	advertising_start();
 
 #if defined(CONFIG_COPRO_DEVICE_CONTROL)
