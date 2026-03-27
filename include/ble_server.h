@@ -59,6 +59,10 @@ typedef enum {
 	BLE_CTRL_CMD_PAIRING_RESULT	   = 0x04,
 } ble_ctrl_cmd_t;
 
+/* RX actions (server → device) */
+#define BLE_CTRL_ACTION_REMOVE_ALL_BONDS 0xFFFFFFFFu
+#define BLE_CTRL_ACTION_REMOVE_BOND      0xFFFFFFFEu
+
 
 struct ble_ctrl_pairing_code {
 	uint32_t passkey; /* 6-digit numeric code */
@@ -78,7 +82,8 @@ struct ble_ctrl_tx_msg {
 };
 
 struct ble_ctrl_rx_msg {
-	uint32_t cmd;
+	uint32_t action;
+	bt_addr_le_t addr; /* optional address parameter, usage depends on action */
 };
 
 #define SC_NAME_BLE_CONTROL "ble-control"

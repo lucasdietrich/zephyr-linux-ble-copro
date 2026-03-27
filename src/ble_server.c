@@ -19,6 +19,11 @@ K_MSGQ_DEFINE(ble_ctrl_tx_msgq,
 			  SC_TX_MSG_QUEUE_SIZE_BLE_CONTROL,
 			  4);
 
+K_MSGQ_DEFINE(ble_ctrl_rx_msgq,
+			  SC_RX_PAYLOAD_SIZE_BLE_CONTROL,
+			  SC_RX_MSG_QUEUE_SIZE_BLE_CONTROL,
+			  4);
+
 LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_DBG);
 
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
@@ -415,6 +420,29 @@ void iter_bond_cb(const struct bt_bond_info *info, void *user_data)
 	printk("Bonded device: %s\n", addr);
 }
 
+static void ble_ctrl_rx_thread(void *a, void *b, void *c)
+{
+	struct ble_ctrl_rx_msg msg;
+
+	for (;;) {
+		k_msgq_get(&ble_ctrl_rx_msgq, &msg, K_FOREVER);
+
+		switch (msg.action) {
+		case BLE_CTRL_ACTION_REMOVE_ALL_BONDS:
+			LOG_INF("Removing all bonds");
+			bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY);
+			break;
+		default:
+			LOG_WRN("Unknown RX ctrl action: 0x%08X", msg.action);
+			break;
+		}
+	}
+}
+
+K_THREAD_DEFINE(ble_ctrl_rx_tid, 1024u,
+				ble_ctrl_rx_thread, NULL, NULL, NULL,
+				K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+
 int ble_server_start(void)
 {
 	int ret;
@@ -422,7 +450,7 @@ int ble_server_start(void)
 	/* Configure the stream client */
 	ret = stream_client_channel_add(SC_ID_BLE_CONTROL,
 									SC_NAME_BLE_CONTROL,
-									&ble_ctrl_tx_msgq, NULL);
+								&ble_ctrl_tx_msgq, &ble_ctrl_rx_msgq);
 	if (ret < 0) {
 		LOG_ERR("Failed to add linky channel to stream client: %d", ret);
 		return ret;
@@ -446,6 +474,8 @@ int ble_server_start(void)
 	}
 
 	bt_foreach_bond(BT_ID_DEFAULT, iter_bond_cb, NULL);
+
+	k_thread_start(ble_ctrl_rx_tid);
 
 	k_work_init(&adv_work, adv_work_handler);
 	advertising_start();
