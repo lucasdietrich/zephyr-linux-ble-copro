@@ -422,6 +422,7 @@ void iter_bond_cb(const struct bt_bond_info *info, void *user_data)
 
 static void ble_ctrl_rx_thread(void *a, void *b, void *c)
 {
+	int ret;
 	struct ble_ctrl_rx_msg msg;
 
 	for (;;) {
@@ -430,7 +431,12 @@ static void ble_ctrl_rx_thread(void *a, void *b, void *c)
 		switch (msg.action) {
 		case BLE_CTRL_ACTION_REMOVE_ALL_BONDS:
 			LOG_INF("Removing all bonds");
-			bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY);
+			ret = bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY);
+			if (ret == 0) {
+				bt_ctrl_msg_send_all_bonds_removed();
+			} else {
+				LOG_ERR("Failed to remove all bonds: %d", ret);
+			}
 			break;
 		default:
 			LOG_WRN("Unknown RX ctrl action: 0x%08X", msg.action);
@@ -501,14 +507,15 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 	buf[4] = msg->addr.type;
 	memcpy(&buf[5], &msg->addr.a.val, sizeof(msg->addr.a.val));
 	switch (msg->cmd) {
-		case BLE_CTRL_CMD_PAIRING_CODE:
+		case BLE_CTRL_EVENT_PAIRING_CODE:
 			sys_put_le32(msg->param.pairing_code.passkey, &buf[4 + sizeof(bt_addr_le_t)]);
 			break;
-		case BLE_CTRL_CMD_PAIRING_RESULT:
+		case BLE_CTRL_EVENT_PAIRING_RESULT:
 			buf[4 + sizeof(bt_addr_le_t)] = msg->param.pairing_result.success ? 0x00 : 0x01;
 			break;
-		case BLE_CTRL_CMD_CONNECTED:
-		case BLE_CTRL_CMD_DISCONNECTED:
+		case BLE_CTRL_EVENT_CONNECTED:
+		case BLE_CTRL_EVENT_DISCONNECTED:
+		case BLE_CTRL_EVENT_ALL_BONDS_REMOVED:
 			/* No additional parameters */
 			break;
 		default:
@@ -520,7 +527,7 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_CMD_PAIRING_CODE,
+		.cmd = BLE_CTRL_EVENT_PAIRING_CODE,
 		.addr = *addr,
 		.param = {
 			.pairing_code = {
@@ -538,7 +545,7 @@ int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
 int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_CMD_PAIRING_RESULT,
+		.cmd = BLE_CTRL_EVENT_PAIRING_RESULT,
 		.addr = *addr,
 		.param = {
 			.pairing_result = {
@@ -556,7 +563,7 @@ int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
 int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_CMD_CONNECTED,
+		.cmd = BLE_CTRL_EVENT_CONNECTED,
 		.addr = *addr,
 	};
 
@@ -569,13 +576,25 @@ int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_CMD_DISCONNECTED,
+		.cmd = BLE_CTRL_EVENT_DISCONNECTED,
 		.addr = *addr,
 		.param = {
 			.pairing_result = {
 				.success = false,
 			},
 		},
+	};
+
+	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};
+	bt_ctrl_msg_serialize(&msg, buf, sizeof(buf));
+
+	return k_msgq_put(&ble_ctrl_tx_msgq, (const void *)buf, K_NO_WAIT);
+}
+
+int bt_ctrl_msg_send_all_bonds_removed(void)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_EVENT_ALL_BONDS_REMOVED,
 	};
 
 	uint8_t buf[SC_TX_PAYLOAD_SIZE_BLE_CONTROL] = {0};

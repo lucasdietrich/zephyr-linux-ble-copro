@@ -30,22 +30,22 @@
  *  12 – firmware flags CCC descriptor
  * ---------------------------------------------------------------------------*/
 
-#define BT_UUID_GARAGE_SERVICE_VAL \
+#define BT_UUID_GARAGE_SERVICE_VAL                                                       \
 	BT_UUID_128_ENCODE(0x539f0000, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
-#define BT_UUID_GARAGE_LEFT_DOOR_VAL \
+#define BT_UUID_GARAGE_LEFT_DOOR_VAL                                                     \
 	BT_UUID_128_ENCODE(0x539f0001, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
-#define BT_UUID_GARAGE_RIGHT_DOOR_VAL \
+#define BT_UUID_GARAGE_RIGHT_DOOR_VAL                                                    \
 	BT_UUID_128_ENCODE(0x539f0002, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
-#define BT_UUID_GARAGE_GATE_VAL \
+#define BT_UUID_GARAGE_GATE_VAL                                                          \
 	BT_UUID_128_ENCODE(0x539f0003, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
-#define BT_UUID_GARAGE_FLAGS_VAL \
+#define BT_UUID_GARAGE_FLAGS_VAL                                                         \
 	BT_UUID_128_ENCODE(0x539f0004, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)
 
-#define BT_UUID_GARAGE_SERVICE    BT_UUID_DECLARE_128(BT_UUID_GARAGE_SERVICE_VAL)
+#define BT_UUID_GARAGE_SERVICE	  BT_UUID_DECLARE_128(BT_UUID_GARAGE_SERVICE_VAL)
 #define BT_UUID_GARAGE_LEFT_DOOR  BT_UUID_DECLARE_128(BT_UUID_GARAGE_LEFT_DOOR_VAL)
 #define BT_UUID_GARAGE_RIGHT_DOOR BT_UUID_DECLARE_128(BT_UUID_GARAGE_RIGHT_DOOR_VAL)
-#define BT_UUID_GARAGE_GATE       BT_UUID_DECLARE_128(BT_UUID_GARAGE_GATE_VAL)
-#define BT_UUID_GARAGE_FLAGS      BT_UUID_DECLARE_128(BT_UUID_GARAGE_FLAGS_VAL)
+#define BT_UUID_GARAGE_GATE		  BT_UUID_DECLARE_128(BT_UUID_GARAGE_GATE_VAL)
+#define BT_UUID_GARAGE_FLAGS	  BT_UUID_DECLARE_128(BT_UUID_GARAGE_FLAGS_VAL)
 
 /* Firmware status flags bit definitions (firmware flags characteristic) */
 #define BLE_FLAG_SERVER_CONNECTED BIT(0) /**< bit 0: TCP stream server is connected */
@@ -53,16 +53,16 @@
 int ble_server_start(void);
 
 typedef enum {
-	BLE_CTRL_CMD_CONNECTED		   = 0x01,
-	BLE_CTRL_CMD_DISCONNECTED	   = 0x02,
-	BLE_CTRL_CMD_PAIRING_CODE	   = 0x03,
-	BLE_CTRL_CMD_PAIRING_RESULT	   = 0x04,
-} ble_ctrl_cmd_t;
+	BLE_CTRL_EVENT_CONNECTED		   = 0x01,
+	BLE_CTRL_EVENT_DISCONNECTED	   = 0x02,
+	BLE_CTRL_EVENT_PAIRING_CODE	   = 0x03,
+	BLE_CTRL_EVENT_PAIRING_RESULT	   = 0x04,
+	BLE_CTRL_EVENT_ALL_BONDS_REMOVED = 0x05, 
+} ble_ctrl_event_t;
 
 /* RX actions (server → device) */
 #define BLE_CTRL_ACTION_REMOVE_ALL_BONDS 0xFFFFFFFFu
-#define BLE_CTRL_ACTION_REMOVE_BOND      0xFFFFFFFEu
-
+#define BLE_CTRL_ACTION_REMOVE_BOND		 0xFFFFFFFEu
 
 struct ble_ctrl_pairing_code {
 	uint32_t passkey; /* 6-digit numeric code */
@@ -99,5 +99,6 @@ int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey);
 int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success);
 int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr);
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr);
+int bt_ctrl_msg_send_all_bonds_removed(void);
 
 #endif /* _BLE_SERVER_H */

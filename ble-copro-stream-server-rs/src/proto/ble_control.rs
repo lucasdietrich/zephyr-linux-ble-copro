@@ -3,41 +3,43 @@ use std::fmt::Display;
 use crate::{StreamChannelError, StreamChannelHandler, StreamChannelIndication, ble::BleAddress};
 
 #[derive(Debug, Clone)]
-pub enum PairingMessage {
+pub enum PairingEvent {
     PairingCode { code: u32 },
     PairingCancelled,
     PairingSucceeded,
+    AllBondsRemoved,
 }
 
-impl Display for PairingMessage {
+impl Display for PairingEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PairingMessage::PairingCode { code } => write!(f, "pairing code: {}", code),
-            PairingMessage::PairingCancelled => write!(f, "pairing cancelled"),
-            PairingMessage::PairingSucceeded => write!(f, "pairing succeeded"),
+            PairingEvent::PairingCode { code } => write!(f, "pairing code: {}", code),
+            PairingEvent::PairingCancelled => write!(f, "pairing cancelled"),
+            PairingEvent::PairingSucceeded => write!(f, "pairing succeeded"),
+            PairingEvent::AllBondsRemoved => write!(f, "all bonds removed"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ConnectionMessage {
+pub enum ConnectionEvent {
     Connected,
     Disconnected,
 }
 
-impl Display for ConnectionMessage {
+impl Display for ConnectionEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectionMessage::Connected => write!(f, "connected"),
-            ConnectionMessage::Disconnected => write!(f, "disconnected"),
+            ConnectionEvent::Connected => write!(f, "connected"),
+            ConnectionEvent::Disconnected => write!(f, "disconnected"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum BleControlMessage {
-    Connection(ConnectionMessage),
-    Pairing(PairingMessage),
+    Connection(ConnectionEvent),
+    Pairing(PairingEvent),
 }
 
 impl Display for BleControlMessage {
@@ -65,10 +67,11 @@ pub struct BleControlHandler;
 
 const BLE_CONTROL_RECORD_MIN_SIZE: usize = 4 + 7; // cmd (4 bytes) + minimum addr length (7 bytes for "xx:xx:xx:xx:xx:xx")
 
-const BLE_CONTROL_CMD_CONNECTED: u32 = 0x01;
-const BLE_CONTROL_CMD_DISCONNECTED: u32 = 0x02;
-const BLE_CONTROL_CMD_PAIRING_CODE: u32 = 0x03;
-const BLE_CONTROL_CMD_PAIRING_RESULT: u32 = 0x04;
+const BLE_CONTROL_EVENT_CONNECTED: u32 = 0x01;
+const BLE_CONTROL_EVENT_DISCONNECTED: u32 = 0x02;
+const BLE_CONTROL_EVENT_PAIRING_CODE: u32 = 0x03;
+const BLE_CONTROL_EVENT_PAIRING_RESULT: u32 = 0x04;
+const BLE_CONTROL_EVENT_ALL_BONDS_REMOVED: u32 = 0x05;
 
 impl StreamChannelHandler for BleControlHandler {
     const CHANNEL_ID: u32 = 0x4f154ca0;
@@ -79,27 +82,30 @@ impl StreamChannelHandler for BleControlHandler {
             return Err(StreamChannelError::InvalidMessageLength);
         }
 
-        let cmd = u32::from_le_bytes(data[0..4].try_into().unwrap());
+        let event = u32::from_le_bytes(data[0..4].try_into().unwrap());
         let addr = BleAddress::from_raw(&data[4..11]).unwrap();
 
-        let message = match cmd {
-            BLE_CONTROL_CMD_CONNECTED => {
-                BleControlMessage::Connection(ConnectionMessage::Connected)
+        let message = match event {
+            BLE_CONTROL_EVENT_CONNECTED => {
+                BleControlMessage::Connection(ConnectionEvent::Connected)
             }
-            BLE_CONTROL_CMD_DISCONNECTED => {
-                BleControlMessage::Connection(ConnectionMessage::Disconnected)
+            BLE_CONTROL_EVENT_DISCONNECTED => {
+                BleControlMessage::Connection(ConnectionEvent::Disconnected)
             }
-            BLE_CONTROL_CMD_PAIRING_CODE => {
-                BleControlMessage::Pairing(PairingMessage::PairingCode {
+            BLE_CONTROL_EVENT_PAIRING_CODE => {
+                BleControlMessage::Pairing(PairingEvent::PairingCode {
                     code: u32::from_le_bytes(data[11..15].try_into().unwrap()),
                 })
             }
-            BLE_CONTROL_CMD_PAIRING_RESULT => {
+            BLE_CONTROL_EVENT_PAIRING_RESULT => {
                 let success_code = u32::from_le_bytes(data[11..15].try_into().unwrap());
                 match success_code {
-                    0 => BleControlMessage::Pairing(PairingMessage::PairingSucceeded),
-                    _ => BleControlMessage::Pairing(PairingMessage::PairingCancelled),
+                    0 => BleControlMessage::Pairing(PairingEvent::PairingSucceeded),
+                    _ => BleControlMessage::Pairing(PairingEvent::PairingCancelled),
                 }
+            }
+            BLE_CONTROL_EVENT_ALL_BONDS_REMOVED => {
+                BleControlMessage::Pairing(PairingEvent::AllBondsRemoved)
             }
             _ => return Err(StreamChannelError::InvalidMessageData),
         };
@@ -114,8 +120,8 @@ pub enum BleControlAction {
     RemoveBond(BleAddress), // None = remove all binds
 }
 
-const BLE_CONTROL_CMD_REMOVE_ALL_BINDS: u32 = 0xFFFFFFFF;
-const BLE_CONTROL_CMD_REMOVE_BIND: u32 = 0xFFFFFFFE;
+const BLE_CONTROL_EVENT_REMOVE_ALL_BINDS: u32 = 0xFFFFFFFF;
+const BLE_CONTROL_EVENT_REMOVE_BIND: u32 = 0xFFFFFFFE;
 
 impl StreamChannelIndication for BleControlAction {
     const CHANNEL_ID: u32 = BleControlHandler::CHANNEL_ID;
@@ -124,12 +130,12 @@ impl StreamChannelIndication for BleControlAction {
         match self {
             BleControlAction::RemoveAllBonds => {
                 let mut data = Vec::with_capacity(4);
-                data.extend_from_slice(&BLE_CONTROL_CMD_REMOVE_ALL_BINDS.to_le_bytes()); // cmd for "remove all binds"
+                data.extend_from_slice(&BLE_CONTROL_EVENT_REMOVE_ALL_BINDS.to_le_bytes()); // cmd for "remove all binds"
                 data
             }
             BleControlAction::RemoveBond(addr) => {
                 let mut data = Vec::with_capacity(4 + 7);
-                data.extend_from_slice(&BLE_CONTROL_CMD_REMOVE_BIND.to_le_bytes()); // cmd for "remove bind"
+                data.extend_from_slice(&BLE_CONTROL_EVENT_REMOVE_BIND.to_le_bytes()); // cmd for "remove bind"
                 data.extend_from_slice(&addr.serialize()); // addr data
                 data
             }
