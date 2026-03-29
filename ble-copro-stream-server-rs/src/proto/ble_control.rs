@@ -40,6 +40,7 @@ impl Display for ConnectionEvent {
 pub enum BleControlMessage {
     Connection(ConnectionEvent),
     Pairing(PairingEvent),
+    IdentityResolved { rpa: BleAddress, identity: BleAddress },
 }
 
 impl Display for BleControlMessage {
@@ -47,6 +48,9 @@ impl Display for BleControlMessage {
         match self {
             BleControlMessage::Connection(conn_msg) => write!(f, "connection event: {}", conn_msg),
             BleControlMessage::Pairing(pairing_msg) => write!(f, "pairing event: {}", pairing_msg),
+            BleControlMessage::IdentityResolved { rpa, identity } => {
+                write!(f, "identity resolved: {} -> {}", rpa, identity)
+            }
         }
     }
 }
@@ -72,6 +76,7 @@ const BLE_CONTROL_EVENT_DISCONNECTED: u32 = 0x02;
 const BLE_CONTROL_EVENT_PAIRING_CODE: u32 = 0x03;
 const BLE_CONTROL_EVENT_PAIRING_RESULT: u32 = 0x04;
 const BLE_CONTROL_EVENT_ALL_BONDS_REMOVED: u32 = 0x05;
+const BLE_CONTROL_EVENT_IDENTITY_RESOLVED: u32 = 0x06;
 
 impl StreamChannelHandler for BleControlHandler {
     const CHANNEL_ID: u32 = 0x4f154ca0;
@@ -106,6 +111,14 @@ impl StreamChannelHandler for BleControlHandler {
             }
             BLE_CONTROL_EVENT_ALL_BONDS_REMOVED => {
                 BleControlMessage::Pairing(PairingEvent::AllBondsRemoved)
+            }
+            BLE_CONTROL_EVENT_IDENTITY_RESOLVED => {
+                if data.len() < 4 + 7 + 7 {
+                    return Err(StreamChannelError::InvalidMessageLength);
+                }
+                let rpa = BleAddress::from_raw(&data[11..18]).unwrap();
+                let identity = BleAddress::from_raw(&data[18..25]).unwrap();
+                BleControlMessage::IdentityResolved { rpa, identity }
             }
             _ => return Err(StreamChannelError::InvalidMessageData),
         };

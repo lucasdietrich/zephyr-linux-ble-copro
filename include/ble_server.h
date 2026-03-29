@@ -53,11 +53,12 @@
 int ble_server_start(void);
 
 typedef enum {
-	BLE_CTRL_EVENT_CONNECTED		   = 0x01,
-	BLE_CTRL_EVENT_DISCONNECTED	   = 0x02,
-	BLE_CTRL_EVENT_PAIRING_CODE	   = 0x03,
-	BLE_CTRL_EVENT_PAIRING_RESULT	   = 0x04,
-	BLE_CTRL_EVENT_ALL_BONDS_REMOVED = 0x05, 
+	BLE_CTRL_EVENT_CONNECTED		 = 0x01,
+	BLE_CTRL_EVENT_DISCONNECTED		 = 0x02,
+	BLE_CTRL_EVENT_PAIRING_CODE		 = 0x03,
+	BLE_CTRL_EVENT_PAIRING_RESULT	 = 0x04,
+	BLE_CTRL_EVENT_ALL_BONDS_REMOVED = 0x05,
+	BLE_CTRL_EVENT_IDENTITY_RESOLVED = 0x06,
 } ble_ctrl_event_t;
 
 /* RX actions (server → device) */
@@ -72,12 +73,18 @@ struct ble_ctrl_pairing_result {
 	uint32_t success; // 0 for success, non-zero for failure (e.g. cancelled by user)
 };
 
+struct ble_ctrl_identity_resolved {
+	bt_addr_le_t rpa;
+	bt_addr_le_t identity;
+};
+
 struct ble_ctrl_tx_msg {
 	uint32_t cmd;
 	bt_addr_le_t addr;
 	union {
 		struct ble_ctrl_pairing_code pairing_code;
 		struct ble_ctrl_pairing_result pairing_result;
+		struct ble_ctrl_identity_resolved identity_resolved;
 	} param;
 };
 
@@ -100,5 +107,6 @@ int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success);
 int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr);
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr);
 int bt_ctrl_msg_send_all_bonds_removed(void);
+int bt_ctrl_msg_send_identity_resolved(const bt_addr_le_t *rpa, const bt_addr_le_t *identity);
 
 #endif /* _BLE_SERVER_H */

@@ -94,26 +94,86 @@ static const struct bt_data sd[] = {
 				  BT_UUID_128_ENCODE(0x539f0000, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)),
 };
 
-static const struct bt_le_adv_param *adv_param = BT_LE_ADV_PARAM(
-	BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_USE_IDENTITY,
-	BT_GAP_ADV_FAST_INT_MIN_1, /* Min Advertising Interval 500ms (800*0.625ms) */
-	BT_GAP_ADV_FAST_INT_MAX_1, /* Max Advertising Interval 500.625ms (801*0.625ms) */
-	NULL);					   /* Set to NULL for undirected advertising */
+/* Min Advertising Interval 500ms (800*0.625ms), max Advertising Interval 500.625ms (801*0.625ms) */
+#define BT_LE_ADV_CONN_PAIRING                                                           \
+	BT_LE_ADV_PARAM(                                                                     \
+		BT_LE_ADV_OPT_CONN, BT_GAP_ADV_FAST_INT_MIN_1, BT_GAP_ADV_FAST_INT_MAX_1, NULL)
+
+#define BT_LE_ADV_CONN_ACCEPT_LIST                                                       \
+	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_FILTER_CONN,                      \
+					BT_GAP_ADV_FAST_INT_MIN_1,                                           \
+					BT_GAP_ADV_FAST_INT_MAX_1,                                           \
+					NULL)
+
+static void setup_accept_list_cb(const struct bt_bond_info *info, void *user_data)
+{
+	int *bond_cnt = user_data;
+	if ((*bond_cnt) < 0) {
+		return;
+	}
+	int err = bt_le_filter_accept_list_add(&info->addr);
+	LOG_INF("Added following peer to whitelist: %x %x",
+			info->addr.a.val[0],
+			info->addr.a.val[1]);
+	if (err) {
+		LOG_INF("Cannot add peer to Filter Accept List (err: %d)", err);
+		(*bond_cnt) = -EIO;
+	} else {
+		(*bond_cnt)++;
+	}
+}
+
+static int setup_accept_list(void)
+{
+	int err = bt_le_filter_accept_list_clear();
+	if (err) {
+		LOG_INF("Cannot clear Filter Accept List (err: %d)", err);
+		return err;
+	}
+	int bond_cnt = 0;
+	bt_foreach_bond(BT_ID_DEFAULT, setup_accept_list_cb, &bond_cnt);
+	return bond_cnt;
+}
 
 static void adv_work_handler(struct k_work *work)
 {
-	int err = bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-
-	if (err == -EALREADY) {
-		return;
+	int err;
+	int allowed_cnt = setup_accept_list();
+	if (allowed_cnt < 0) {
+		LOG_INF("Acceptlist setup failed (err:%d)", allowed_cnt);
+	} else {
+		if (allowed_cnt == 0) {
+			LOG_INF("Advertising with no Accept list");
+			err = bt_le_adv_start(
+				BT_LE_ADV_CONN_PAIRING, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+		} else {
+			LOG_INF("Advertising with Accept list");
+			LOG_INF("Acceptlist allowed count: %d", allowed_cnt);
+			err = bt_le_adv_start(
+				BT_LE_ADV_CONN_ACCEPT_LIST, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+		}
+		if (err) {
+			LOG_INF("Advertising failed to start (err %d)", err);
+			return;
+		}
+		LOG_INF("Advertising successfully started");
 	}
-	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
-		return;
-	}
-
-	printk("Advertising successfully started\n");
 }
+
+// static void adv_work_handler(struct k_work *work)
+// {
+// 	int err = bt_le_adv_start(BT_LE_ADV_CONN_PAIRING, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+
+// 	if (err == -EALREADY) {
+// 		return;
+// 	}
+// 	if (err) {
+// 		printk("Advertising failed to start (err %d)\n", err);
+// 		return;
+// 	}
+
+// 	printk("Advertising successfully started\n");
+// }
 
 static void advertising_start(void)
 {
@@ -255,11 +315,24 @@ void auth_cancel(struct bt_conn *conn)
 	bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), false);
 }
 
+void on_identity_resolved(struct bt_conn *conn,
+						  const bt_addr_le_t *rpa,
+						  const bt_addr_le_t *identity)
+{
+	char rpa_str[BT_ADDR_LE_STR_LEN];
+	char identity_str[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_to_str(rpa, rpa_str, sizeof(rpa_str));
+	bt_addr_le_to_str(identity, identity_str, sizeof(identity_str));
+	LOG_INF("Identity resolved: %s -> %s\n", rpa_str, identity_str);
+	bt_ctrl_msg_send_identity_resolved(rpa, identity);
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected              = on_connected,
     .disconnected           = on_disconnected,
     .recycled               = on_recycled,
 	.security_changed 		= on_security_changed,
+	.identity_resolved 		= on_identity_resolved,
 };
 
 static struct bt_conn_auth_cb conn_auth_callbacks = {
@@ -495,6 +568,13 @@ static void ble_ctrl_rx_thread(void *a, void *b, void *c)
 			} else {
 				LOG_ERR("Failed to remove all bonds: %d", ret);
 			}
+
+			// Restart advertising to update the accept list
+			ret = bt_le_adv_stop();
+			if (ret) {
+				LOG_ERR("Failed to stop advertising: %d", ret);
+			}
+			advertising_start();
 			break;
 		default:
 			LOG_WRN("Unknown RX ctrl action: 0x%08X", msg.action);
@@ -578,6 +658,10 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 		case BLE_CTRL_EVENT_PAIRING_RESULT:
 			buf[4 + sizeof(bt_addr_le_t)] = msg->param.pairing_result.success ? 0x00 : 0x01;
 			break;
+		case BLE_CTRL_EVENT_IDENTITY_RESOLVED:
+			memcpy(&buf[4 + sizeof(bt_addr_le_t)], &msg->param.identity_resolved.rpa, sizeof(bt_addr_le_t));
+			memcpy(&buf[4 + 2*sizeof(bt_addr_le_t)], &msg->param.identity_resolved.identity, sizeof(bt_addr_le_t));
+			break;
 		case BLE_CTRL_EVENT_CONNECTED:
 		case BLE_CTRL_EVENT_DISCONNECTED:
 		case BLE_CTRL_EVENT_ALL_BONDS_REMOVED:
@@ -638,6 +722,16 @@ int bt_ctrl_msg_send_all_bonds_removed(void)
 {
 	struct ble_ctrl_tx_msg msg = {
 		.cmd = BLE_CTRL_EVENT_ALL_BONDS_REMOVED,
+	};
+	return bt_ctrl_msg_enqueue(&msg);
+}
+
+int bt_ctrl_msg_send_identity_resolved(const bt_addr_le_t *rpa,
+									   const bt_addr_le_t *identity)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd   = BLE_CTRL_EVENT_IDENTITY_RESOLVED,
+		.param = {.identity_resolved = {.rpa = *rpa, .identity = *identity}},
 	};
 	return bt_ctrl_msg_enqueue(&msg);
 }
