@@ -57,10 +57,8 @@ impl StreamChannelHandler for XiaomiHandler {
             return Err(StreamChannelError::InvalidMessageLength);
         }
 
-        let mut ble_mac = [0; 6];
-        ble_mac.copy_from_slice(&data[0..6]);
-
-        let ble_type = data[6];
+        let ble_addr =
+            BleAddress::from_raw(&data[0..7]).ok_or(StreamChannelError::InvalidMessageData)?;
         let rssi = data[7] as i8;
         let version = data[8];
         let timestamp = Timestamp::Uptime(LittleEndian::read_i64(&data[9..17]) as u64);
@@ -68,8 +66,6 @@ impl StreamChannelHandler for XiaomiHandler {
         let humidity = LittleEndian::read_u16(&data[19..21]) as f32 / 100.0;
         let battery_mv = LittleEndian::read_u16(&data[21..23]);
         let battery_percent = data[23];
-
-        let ble_addr = BleAddress::new(ble_mac, ble_type);
 
         Ok(XiaomiRecord {
             version,

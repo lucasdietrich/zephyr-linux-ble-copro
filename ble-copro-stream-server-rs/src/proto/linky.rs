@@ -77,10 +77,8 @@ impl StreamChannelHandler for LinkyTicHandler {
             return Err(StreamChannelError::InvalidMessageLength);
         }
 
-        let mut ble_mac = [0; 6];
-        ble_mac.copy_from_slice(&data[0..6]);
-        let ble_type = data[6];
-        let ble_addr = BleAddress::new(ble_mac, ble_type);
+        let ble_addr =
+            BleAddress::from_raw(&data[0..7]).ok_or(StreamChannelError::InvalidMessageData)?;
         let rssi = data[7] as i8;
         let version = data[8];
         let flags = u32::from_le_bytes([data[9], data[10], data[11], data[12]]);

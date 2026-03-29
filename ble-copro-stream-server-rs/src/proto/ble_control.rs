@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{StreamChannelError, StreamChannelHandler, StreamChannelIndication, ble::BleAddress};
+use crate::{ble::BleAddress, StreamChannelError, StreamChannelHandler, StreamChannelIndication};
 
 #[derive(Debug, Clone)]
 pub enum PairingEvent {
@@ -116,7 +116,7 @@ impl StreamChannelHandler for BleControlHandler {
 
 #[derive(Debug, Clone)]
 pub enum BleControlAction {
-    RemoveAllBonds, // None = remove all binds
+    RemoveAllBonds,         // None = remove all binds
     RemoveBond(BleAddress), // None = remove all binds
 }
 

@@ -58,19 +58,19 @@ impl BleAddress {
     pub fn mac_string(&self) -> String {
         format!(
             "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.mac[0], self.mac[1], self.mac[2], self.mac[3], self.mac[4], self.mac[5]
+            self.mac[5], self.mac[4], self.mac[3], self.mac[2], self.mac[1], self.mac[0]
         )
     }
 
     pub fn to_slug(&self) -> String {
         format!(
             "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            self.mac[0], self.mac[1], self.mac[2], self.mac[3], self.mac[4], self.mac[5]
+            self.mac[5], self.mac[4], self.mac[3], self.mac[2], self.mac[1], self.mac[0]
         )
     }
 
     pub fn mac_manufacturer_part(&self) -> String {
-        format!("{:02x}{:02x}{:02x}", self.mac[3], self.mac[4], self.mac[5])
+        format!("{:02x}{:02x}{:02x}", self.mac[5], self.mac[4], self.mac[3])
     }
 
     pub(crate) fn serialize(&self) -> [u8; 7] {

@@ -1,5 +1,7 @@
 use ble_copro_stream_server::{
-    StreamChannelError, StreamServer, device_control::{DeviceCtrlCmd, DeviceCtrlStateMsg, DoorState, GarageDoorsState}, stream_message::ChannelMessage
+    device_control::{DeviceCtrlCmd, DeviceCtrlStateMsg, DoorState, GarageDoorsState},
+    stream_message::ChannelMessage,
+    StreamChannelError, StreamServer,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -8,7 +10,6 @@ struct GarageDoorController {
 }
 
 impl GarageDoorController {
-
     fn get_initial_state(&self) -> DeviceCtrlStateMsg {
         DeviceCtrlStateMsg::GarageDoors(self.state.clone())
     }
@@ -53,7 +54,10 @@ async fn main() {
     loop {
         let mut channel = server.accept().await.expect("Failed to accept connection");
 
-        channel.send_indication(garage_controller.get_initial_state()).await.expect("Failed to send initial state");
+        channel
+            .send_indication(garage_controller.get_initial_state())
+            .await
+            .expect("Failed to send initial state");
 
         loop {
             match channel.next().await {
