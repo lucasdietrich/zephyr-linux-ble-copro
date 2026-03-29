@@ -53,17 +53,20 @@
 int ble_server_start(void);
 
 typedef enum {
-	BLE_CTRL_EVENT_CONNECTED		 = 0x01,
-	BLE_CTRL_EVENT_DISCONNECTED		 = 0x02,
-	BLE_CTRL_EVENT_PAIRING_CODE		 = 0x03,
-	BLE_CTRL_EVENT_PAIRING_RESULT	 = 0x04,
-	BLE_CTRL_EVENT_ALL_BONDS_REMOVED = 0x05,
-	BLE_CTRL_EVENT_IDENTITY_RESOLVED = 0x06,
+	BLE_CTRL_EVENT_CONNECTED		  = 0x01,
+	BLE_CTRL_EVENT_DISCONNECTED		  = 0x02,
+	BLE_CTRL_EVENT_PAIRING_CODE		  = 0x03,
+	BLE_CTRL_EVENT_PAIRING_RESULT	  = 0x04,
+	BLE_CTRL_EVENT_ALL_BONDS_REMOVED  = 0x05,
+	BLE_CTRL_EVENT_IDENTITY_RESOLVED  = 0x06,
+	BLE_CTRL_EVENT_PAIRING_ADV_STARTED = 0x07, /**< pairing advertising window opened */
+	BLE_CTRL_EVENT_PAIRING_ADV_STOPPED = 0x08, /**< pairing advertising window closed */
 } ble_ctrl_event_t;
 
 /* RX actions (server → device) */
-#define BLE_CTRL_ACTION_REMOVE_ALL_BONDS 0xFFFFFFFFu
-#define BLE_CTRL_ACTION_REMOVE_BOND		 0xFFFFFFFEu
+#define BLE_CTRL_ACTION_REMOVE_ALL_BONDS    0xFFFFFFFFu
+#define BLE_CTRL_ACTION_REMOVE_BOND		    0xFFFFFFFEu
+#define BLE_CTRL_ACTION_ENABLE_PAIRING_ADV  0xFFFFFFFDu /**< open a pairing advertising window; param: duration_s */
 
 struct ble_ctrl_pairing_code {
 	uint32_t passkey; /* 6-digit numeric code */
@@ -78,6 +81,10 @@ struct ble_ctrl_identity_resolved {
 	bt_addr_le_t identity;
 };
 
+struct ble_ctrl_pairing_adv_started {
+	uint32_t duration_s; /**< advertising window duration in seconds */
+};
+
 struct ble_ctrl_tx_msg {
 	uint32_t cmd;
 	bt_addr_le_t addr;
@@ -85,12 +92,20 @@ struct ble_ctrl_tx_msg {
 		struct ble_ctrl_pairing_code pairing_code;
 		struct ble_ctrl_pairing_result pairing_result;
 		struct ble_ctrl_identity_resolved identity_resolved;
+		struct ble_ctrl_pairing_adv_started pairing_adv_started;
 	} param;
+};
+
+struct ble_ctrl_pairing_adv_params {
+	uint32_t duration_s; /**< advertising window duration in seconds */
 };
 
 struct ble_ctrl_rx_msg {
 	uint32_t action;
-	bt_addr_le_t addr; /* optional address parameter, usage depends on action */
+	union {
+		bt_addr_le_t addr;                               /**< REMOVE_BOND: target address */
+		struct ble_ctrl_pairing_adv_params pairing_adv;  /**< ENABLE_PAIRING_ADV: duration */
+	} param;
 };
 
 #define SC_NAME_BLE_CONTROL "ble-control"
@@ -108,5 +123,7 @@ int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr);
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr);
 int bt_ctrl_msg_send_all_bonds_removed(void);
 int bt_ctrl_msg_send_identity_resolved(const bt_addr_le_t *rpa, const bt_addr_le_t *identity);
+int bt_ctrl_msg_send_pairing_adv_started(uint32_t duration_s);
+int bt_ctrl_msg_send_pairing_adv_stopped(void);
 
 #endif /* _BLE_SERVER_H */

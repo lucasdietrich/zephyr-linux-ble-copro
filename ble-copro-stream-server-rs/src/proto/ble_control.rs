@@ -8,6 +8,8 @@ pub enum PairingEvent {
     PairingCancelled,
     PairingSucceeded,
     AllBondsRemoved,
+    PairingAdvStarted { duration_s: u32 },
+    PairingAdvStopped,
 }
 
 impl Display for PairingEvent {
@@ -17,6 +19,10 @@ impl Display for PairingEvent {
             PairingEvent::PairingCancelled => write!(f, "pairing cancelled"),
             PairingEvent::PairingSucceeded => write!(f, "pairing succeeded"),
             PairingEvent::AllBondsRemoved => write!(f, "all bonds removed"),
+            PairingEvent::PairingAdvStarted { duration_s } => {
+                write!(f, "pairing advertising started ({} s)", duration_s)
+            }
+            PairingEvent::PairingAdvStopped => write!(f, "pairing advertising stopped"),
         }
     }
 }
@@ -77,6 +83,8 @@ const BLE_CONTROL_EVENT_PAIRING_CODE: u32 = 0x03;
 const BLE_CONTROL_EVENT_PAIRING_RESULT: u32 = 0x04;
 const BLE_CONTROL_EVENT_ALL_BONDS_REMOVED: u32 = 0x05;
 const BLE_CONTROL_EVENT_IDENTITY_RESOLVED: u32 = 0x06;
+const BLE_CONTROL_EVENT_PAIRING_ADV_STARTED: u32 = 0x07;
+const BLE_CONTROL_EVENT_PAIRING_ADV_STOPPED: u32 = 0x08;
 
 impl StreamChannelHandler for BleControlHandler {
     const CHANNEL_ID: u32 = 0x4f154ca0;
@@ -120,6 +128,16 @@ impl StreamChannelHandler for BleControlHandler {
                 let identity = BleAddress::from_raw(&data[18..25]).unwrap();
                 BleControlMessage::IdentityResolved { rpa, identity }
             }
+            BLE_CONTROL_EVENT_PAIRING_ADV_STARTED => {
+                if data.len() < 4 + 7 + 4 {
+                    return Err(StreamChannelError::InvalidMessageLength);
+                }
+                let duration_s = u32::from_le_bytes(data[11..15].try_into().unwrap());
+                BleControlMessage::Pairing(PairingEvent::PairingAdvStarted { duration_s })
+            }
+            BLE_CONTROL_EVENT_PAIRING_ADV_STOPPED => {
+                BleControlMessage::Pairing(PairingEvent::PairingAdvStopped)
+            }
             _ => return Err(StreamChannelError::InvalidMessageData),
         };
 
@@ -129,12 +147,14 @@ impl StreamChannelHandler for BleControlHandler {
 
 #[derive(Debug, Clone)]
 pub enum BleControlAction {
-    RemoveAllBonds,         // None = remove all binds
-    RemoveBond(BleAddress), // None = remove all binds
+    RemoveAllBonds,
+    RemoveBond(BleAddress),
+    EnablePairingAdv { duration_s: u32 },
 }
 
 const BLE_CONTROL_EVENT_REMOVE_ALL_BINDS: u32 = 0xFFFFFFFF;
 const BLE_CONTROL_EVENT_REMOVE_BIND: u32 = 0xFFFFFFFE;
+const BLE_CONTROL_ACTION_ENABLE_PAIRING_ADV: u32 = 0xFFFFFFFD;
 
 impl StreamChannelIndication for BleControlAction {
     const CHANNEL_ID: u32 = BleControlHandler::CHANNEL_ID;
@@ -150,6 +170,12 @@ impl StreamChannelIndication for BleControlAction {
                 let mut data = Vec::with_capacity(4 + 7);
                 data.extend_from_slice(&BLE_CONTROL_EVENT_REMOVE_BIND.to_le_bytes()); // cmd for "remove bind"
                 data.extend_from_slice(&addr.serialize()); // addr data
+                data
+            }
+            BleControlAction::EnablePairingAdv { duration_s } => {
+                let mut data = Vec::with_capacity(4 + 4);
+                data.extend_from_slice(&BLE_CONTROL_ACTION_ENABLE_PAIRING_ADV.to_le_bytes());
+                data.extend_from_slice(&duration_s.to_le_bytes());
                 data
             }
         }

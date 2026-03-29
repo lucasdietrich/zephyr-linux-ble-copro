@@ -39,6 +39,10 @@ struct conn_slot {
 static struct conn_slot conn_slots[CONFIG_BT_MAX_CONN];
 static struct k_work adv_work;
 
+/* Pairing advertising window — set while open-pairing ADV is active. */
+static atomic_t pairing_adv_active = ATOMIC_INIT(0);
+static struct k_work_delayable pairing_adv_timeout_work;
+
 static struct conn_slot *conn_slot_find_free(void)
 {
 	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
@@ -135,49 +139,56 @@ static int setup_accept_list(void)
 	return bond_cnt;
 }
 
-static void adv_work_handler(struct k_work *work)
-{
-	int err;
-	int allowed_cnt = setup_accept_list();
-	if (allowed_cnt < 0) {
-		LOG_INF("Acceptlist setup failed (err:%d)", allowed_cnt);
-	} else {
-		if (allowed_cnt == 0) {
-			LOG_INF("Advertising with no Accept list");
-			err = bt_le_adv_start(
-				BT_LE_ADV_CONN_PAIRING, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-		} else {
-			LOG_INF("Advertising with Accept list");
-			LOG_INF("Acceptlist allowed count: %d", allowed_cnt);
-			err = bt_le_adv_start(
-				BT_LE_ADV_CONN_ACCEPT_LIST, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-		}
-		if (err) {
-			LOG_INF("Advertising failed to start (err %d)", err);
-			return;
-		}
-		LOG_INF("Advertising successfully started");
-	}
-}
-
-// static void adv_work_handler(struct k_work *work)
-// {
-// 	int err = bt_le_adv_start(BT_LE_ADV_CONN_PAIRING, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-
-// 	if (err == -EALREADY) {
-// 		return;
-// 	}
-// 	if (err) {
-// 		printk("Advertising failed to start (err %d)\n", err);
-// 		return;
-// 	}
-
-// 	printk("Advertising successfully started\n");
-// }
-
 static void advertising_start(void)
 {
 	k_work_submit(&adv_work);
+}
+
+
+static void pairing_adv_timeout_handler(struct k_work *work)
+{
+	LOG_INF("Pairing advertising window expired");
+	atomic_clear(&pairing_adv_active);
+
+	int ret = bt_le_adv_stop();
+	if (ret && ret != -EALREADY) {
+		LOG_WRN("Failed to stop advertising: %d", ret);
+	}
+
+	bt_ctrl_msg_send_pairing_adv_stopped();
+	advertising_start(); /* restart in normal accept-list mode */
+}
+
+static void adv_work_handler(struct k_work *work)
+{
+	int err;
+
+	if (atomic_get(&pairing_adv_active)) {
+		/* Pairing window open — advertise to all devices (no accept-list filter). */
+		LOG_INF("Advertising for pairing (open, no accept list)");
+		err = bt_le_adv_start(
+			BT_LE_ADV_CONN_PAIRING, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+		if (err && err != -EALREADY) {
+			LOG_ERR("Pairing advertising failed to start (err %d)", err);
+		}
+		return;
+	}
+
+	int allowed_cnt = setup_accept_list();
+	if (allowed_cnt < 0) {
+		LOG_ERR("Acceptlist setup failed (err:%d)", allowed_cnt);
+		return;
+	}
+
+	/* Always restrict connections to the accept list. New devices can only
+	 * connect during an explicit pairing window (BLE_CTRL_ACTION_ENABLE_PAIRING_ADV). */
+	LOG_INF("Advertising with accept list (%d bonded peer(s))", allowed_cnt);
+	err = bt_le_adv_start(BT_LE_ADV_CONN_ACCEPT_LIST, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	if (err) {
+		LOG_ERR("Advertising failed to start (err %d)", err);
+		return;
+	}
+	LOG_INF("Advertising successfully started");
 }
 
 #if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
@@ -576,6 +587,25 @@ static void ble_ctrl_rx_thread(void *a, void *b, void *c)
 			}
 			advertising_start();
 			break;
+		case BLE_CTRL_ACTION_ENABLE_PAIRING_ADV: {
+			uint32_t duration_s = msg.param.pairing_adv.duration_s;
+			LOG_INF("Enable pairing advertising for %u s", duration_s);
+
+			atomic_set(&pairing_adv_active, 1);
+
+			/* Stop current advertising and restart without accept-list filter. */
+			ret = bt_le_adv_stop();
+			if (ret && ret != -EALREADY) {
+				LOG_WRN("Failed to stop advertising before pairing window: %d", ret);
+			}
+			advertising_start();
+
+			/* Schedule automatic end of the pairing window. */
+			k_work_reschedule(&pairing_adv_timeout_work, K_SECONDS(duration_s));
+
+			bt_ctrl_msg_send_pairing_adv_started(duration_s);
+			break;
+		}
 		default:
 			LOG_WRN("Unknown RX ctrl action: 0x%08X", msg.action);
 			break;
@@ -622,6 +652,7 @@ int ble_server_start(void)
 	k_thread_start(ble_ctrl_rx_tid);
 
 	k_work_init(&adv_work, adv_work_handler);
+	k_work_init_delayable(&pairing_adv_timeout_work, pairing_adv_timeout_handler);
 
 #if CONFIG_COPRO_BLE_IDLE_TIMEOUT_S > 0
 	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
@@ -661,6 +692,12 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 		case BLE_CTRL_EVENT_IDENTITY_RESOLVED:
 			memcpy(&buf[4 + sizeof(bt_addr_le_t)], &msg->param.identity_resolved.rpa, sizeof(bt_addr_le_t));
 			memcpy(&buf[4 + 2*sizeof(bt_addr_le_t)], &msg->param.identity_resolved.identity, sizeof(bt_addr_le_t));
+			break;
+		case BLE_CTRL_EVENT_PAIRING_ADV_STARTED:
+			sys_put_le32(msg->param.pairing_adv_started.duration_s, &buf[4 + sizeof(bt_addr_le_t)]);
+			break;
+		case BLE_CTRL_EVENT_PAIRING_ADV_STOPPED:
+			/* No additional parameters */
 			break;
 		case BLE_CTRL_EVENT_CONNECTED:
 		case BLE_CTRL_EVENT_DISCONNECTED:
@@ -732,6 +769,23 @@ int bt_ctrl_msg_send_identity_resolved(const bt_addr_le_t *rpa,
 	struct ble_ctrl_tx_msg msg = {
 		.cmd   = BLE_CTRL_EVENT_IDENTITY_RESOLVED,
 		.param = {.identity_resolved = {.rpa = *rpa, .identity = *identity}},
+	};
+	return bt_ctrl_msg_enqueue(&msg);
+}
+
+int bt_ctrl_msg_send_pairing_adv_started(uint32_t duration_s)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd   = BLE_CTRL_EVENT_PAIRING_ADV_STARTED,
+		.param = {.pairing_adv_started = {.duration_s = duration_s}},
+	};
+	return bt_ctrl_msg_enqueue(&msg);
+}
+
+int bt_ctrl_msg_send_pairing_adv_stopped(void)
+{
+	struct ble_ctrl_tx_msg msg = {
+		.cmd = BLE_CTRL_EVENT_PAIRING_ADV_STOPPED,
 	};
 	return bt_ctrl_msg_enqueue(&msg);
 }
