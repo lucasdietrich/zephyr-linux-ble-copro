@@ -41,7 +41,8 @@ K_MSGQ_DEFINE(device_control_rx_msgq,
  */
 static int device_ctrl_command_serialize(device_ctrl_cmd_t cmd,
 										 const bt_addr_le_t *ble_addr,
-										 uint8_t *buf, size_t len)
+										 uint8_t *buf,
+										 size_t len)
 {
 	if (len < 8u) {
 		return -EINVAL;
@@ -75,8 +76,8 @@ int device_control_send_cmd(device_ctrl_cmd_t cmd, const bt_addr_le_t *ble_addr)
 }
 
 static device_ctrl_garage_doors_state_t garage_state = {
-	.left_door  = DEVICE_CTRL_DOOR_UNKNOWN,
-	.gate       = DEVICE_CTRL_DOOR_UNKNOWN,
+	.left_door	= DEVICE_CTRL_DOOR_UNKNOWN,
+	.gate		= DEVICE_CTRL_DOOR_UNKNOWN,
 	.right_door = DEVICE_CTRL_DOOR_UNKNOWN,
 };
 
@@ -92,17 +93,22 @@ static void device_control_rx_thread(void *a, void *b, void *c)
 		switch (msg.type) {
 		case DEVICE_CTRL_STATE_TYPE_GARAGE_DOORS: {
 			const device_ctrl_garage_doors_state_t *new = &msg.payload.garage_doors;
-			uint8_t changed = 0;
+			uint8_t changed								= 0;
 
-			if (new->left_door  != garage_state.left_door)  changed |= DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR;
-			if (new->right_door != garage_state.right_door) changed |= DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR;
-			if (new->gate       != garage_state.gate)       changed |= DEVICE_CTRL_GARAGE_CHANGED_GATE;
+			if (new->left_door != garage_state.left_door)
+				changed |= DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR;
+			if (new->right_door != garage_state.right_door)
+				changed |= DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR;
+			if (new->gate != garage_state.gate)
+				changed |= DEVICE_CTRL_GARAGE_CHANGED_GATE;
 
 			garage_state = *new;
 
 			LOG_DBG("Garage state update: left=%d gate=%d right=%d (changed=0x%02x)",
-					garage_state.left_door, garage_state.gate,
-					garage_state.right_door, changed);
+					garage_state.left_door,
+					garage_state.gate,
+					garage_state.right_door,
+					changed);
 
 			if (state_cb != NULL && changed) {
 				state_cb(new, changed);
@@ -116,9 +122,15 @@ static void device_control_rx_thread(void *a, void *b, void *c)
 	}
 }
 
-K_THREAD_DEFINE(device_ctrl_rx_tid, 1024u,
-				device_control_rx_thread, NULL, NULL, NULL,
-				K_PRIO_COOP(7), 0, SYS_FOREVER_MS);
+K_THREAD_DEFINE(device_ctrl_rx_tid,
+				1024u,
+				device_control_rx_thread,
+				NULL,
+				NULL,
+				NULL,
+				K_PRIO_COOP(7),
+				0,
+				SYS_FOREVER_MS);
 
 device_ctrl_garage_doors_state_t device_control_get_garage_doors_state(void)
 {

@@ -25,8 +25,10 @@ typedef void (*stream_client_conn_cb_t)(bool connected);
 
 void stream_client_set_conn_cb(stream_client_conn_cb_t cb);
 
-int stream_client_channel_add(uint32_t channel_id, const char *name,
-							   struct k_msgq *tx_msgq, struct k_msgq *rx_msgq);
+int stream_client_channel_add(uint32_t channel_id,
+							  const char *name,
+							  struct k_msgq *tx_msgq,
+							  struct k_msgq *rx_msgq);
 
 int stream_try_connect(void);
 

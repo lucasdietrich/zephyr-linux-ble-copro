@@ -38,7 +38,7 @@ typedef enum __packed {
  */
 typedef struct __packed {
 	device_ctrl_cmd_t cmd;
-	bt_addr_le_t      ble_addr; /**< BLE address of the requesting client */
+	bt_addr_le_t ble_addr; /**< BLE address of the requesting client */
 } device_ctrl_command_msg_t;
 
 /*---------------------------------------------------------------------------
@@ -49,8 +49,8 @@ typedef struct __packed {
  * @brief Individual door / gate position state.
  */
 typedef enum __packed {
-	DEVICE_CTRL_DOOR_CLOSED  = 0x00,
-	DEVICE_CTRL_DOOR_OPEN    = 0x01,
+	DEVICE_CTRL_DOOR_CLOSED	 = 0x00,
+	DEVICE_CTRL_DOOR_OPEN	 = 0x01,
 	DEVICE_CTRL_DOOR_UNKNOWN = 0xFF,
 } device_ctrl_door_state_t;
 
@@ -60,8 +60,8 @@ typedef enum __packed {
  * Carries the live state of the left door, central gate and right door.
  */
 typedef struct __packed {
-	device_ctrl_door_state_t left_door;  /**< Left garage door */
-	device_ctrl_door_state_t gate;       /**< Central gate */
+	device_ctrl_door_state_t left_door;	 /**< Left garage door */
+	device_ctrl_door_state_t gate;		 /**< Central gate */
 	device_ctrl_door_state_t right_door; /**< Right garage door */
 } device_ctrl_garage_doors_state_t;
 
@@ -92,7 +92,7 @@ typedef union __packed {
  *              selected by @p type)
  */
 typedef struct __packed {
-	device_ctrl_state_type_t    type;
+	device_ctrl_state_type_t type;
 	device_ctrl_state_payload_t payload;
 } device_ctrl_state_msg_t;
 
@@ -116,7 +116,7 @@ extern struct k_msgq device_control_rx_msgq;
  */
 #define DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR  BIT(0)
 #define DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR BIT(1)
-#define DEVICE_CTRL_GARAGE_CHANGED_GATE       BIT(2)
+#define DEVICE_CTRL_GARAGE_CHANGED_GATE		  BIT(2)
 
 /**
  * @brief Callback invoked (from the RX thread) whenever the garage-doors

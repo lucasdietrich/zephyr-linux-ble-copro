@@ -1,9 +1,8 @@
+#include <zephyr/app_version.h>
 #include <zephyr/kernel.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/sys/byteorder.h>
-
-#include <zephyr/app_version.h>
 
 #include <led.h>
 #include <stream_client.h>
@@ -35,11 +34,11 @@ typedef struct {
 	/* +1 for the RX-disconnect signal slot */
 	struct k_poll_event poll_events[CONFIG_COPRO_STREAM_CHANNELS_COUNT + 1];
 	struct k_poll_signal rx_disconnect_signal; /* fired by RX thread on drop */
-	struct k_sem rx_connected_sem; /* given by TX on connect, taken by RX */
+	struct k_sem rx_connected_sem;			   /* given by TX on connect, taken by RX */
 #else
 	struct k_poll_event poll_events[CONFIG_COPRO_STREAM_CHANNELS_COUNT];
 #endif
-	struct k_mutex conn_mutex;     /* serialises disconnect() */
+	struct k_mutex conn_mutex; /* serialises disconnect() */
 	size_t channels_count;
 	chan_t channels[CONFIG_COPRO_STREAM_CHANNELS_COUNT];
 } scli_t;
@@ -52,17 +51,33 @@ static scli_t scli = {
 
 int tx_thread(void *arg0, void *arg1, void *arg2);
 
-K_THREAD_DEFINE(
-	tx_stream_tid, 2048u, tx_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+K_THREAD_DEFINE(tx_stream_tid,
+				2048u,
+				tx_thread,
+				NULL,
+				NULL,
+				NULL,
+				K_PRIO_PREEMPT(10),
+				0,
+				SYS_FOREVER_MS);
 
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
 int rx_thread(void *arg0, void *arg1, void *arg2);
-K_THREAD_DEFINE(
-	rx_stream_tid, 2048u, rx_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+K_THREAD_DEFINE(rx_stream_tid,
+				2048u,
+				rx_thread,
+				NULL,
+				NULL,
+				NULL,
+				K_PRIO_PREEMPT(10),
+				0,
+				SYS_FOREVER_MS);
 #endif
 
-int stream_client_channel_add(uint32_t channel_id, const char *name,
-							   struct k_msgq *tx_msgq, struct k_msgq *rx_msgq)
+int stream_client_channel_add(uint32_t channel_id,
+							  const char *name,
+							  struct k_msgq *tx_msgq,
+							  struct k_msgq *rx_msgq)
 {
 	int i;
 
@@ -81,8 +96,9 @@ int stream_client_channel_add(uint32_t channel_id, const char *name,
 	}
 
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
-	if (rx_msgq != NULL && (rx_msgq->msg_size == 0 ||
-		rx_msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE)) {
+	if (rx_msgq != NULL &&
+		(rx_msgq->msg_size == 0 ||
+		 rx_msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE)) {
 		return -EINVAL;
 	}
 #endif
@@ -92,9 +108,9 @@ int stream_client_channel_add(uint32_t channel_id, const char *name,
 			scli.channels[i].channel_id == channel_id) {
 			strncpy(scli.channels[i].name, name, sizeof(scli.channels[i].name));
 			scli.channels[i].channel_id = channel_id;
-			scli.channels[i].tx_msgq    = tx_msgq;
+			scli.channels[i].tx_msgq	= tx_msgq;
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
-			scli.channels[i].rx_msgq    = rx_msgq;
+			scli.channels[i].rx_msgq = rx_msgq;
 #endif
 
 			scli.channels_count++;
@@ -218,7 +234,7 @@ static int disconnect(scli_t *s)
 	k_mutex_lock(&s->conn_mutex, K_FOREVER);
 	if (s->sock >= 0) {
 		close(s->sock);
-		s->sock  = -1;
+		s->sock	 = -1;
 		s->state = STREAM_DISCONNECTED;
 		LED_OFF();
 		LOG_INF("Disconnected");
@@ -264,7 +280,9 @@ static void send_control_firmware_version(scli_t *s)
 		LOG_ERR("Failed to send firmware version: %d", ret);
 	} else {
 		LOG_INF("Firmware version %d.%d.%d sent on control channel",
-				APP_VERSION_MAJOR, APP_VERSION_MINOR, APP_PATCHLEVEL);
+				APP_VERSION_MAJOR,
+				APP_VERSION_MINOR,
+				APP_PATCHLEVEL);
 	}
 }
 
@@ -327,20 +345,17 @@ int tx_thread(void *arg0, void *arg1, void *arg2)
 
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
 			/* Check whether the RX thread signaled a disconnect */
-			if (scli.poll_events[scli.channels_count].state ==
-				K_POLL_STATE_SIGNALED) {
+			if (scli.poll_events[scli.channels_count].state == K_POLL_STATE_SIGNALED) {
 				k_poll_signal_reset(&scli.rx_disconnect_signal);
-				scli.poll_events[scli.channels_count].state =
-					K_POLL_STATE_NOT_READY;
+				scli.poll_events[scli.channels_count].state = K_POLL_STATE_NOT_READY;
 				/* State already set to DISCONNECTED by the RX thread */
 				break;
 			}
 #endif
 
-			for (int i = 0; i < scli.channels_count &&
-							scli.state == STREAM_CONNECTED; i++) {
-				if (scli.poll_events[i].state ==
-					K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
+			for (int i = 0; i < scli.channels_count && scli.state == STREAM_CONNECTED;
+				 i++) {
+				if (scli.poll_events[i].state == K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
 					chan_t *chan = &scli.channels[i];
 
 					if (k_msgq_get(chan->tx_msgq, (void *)buf, K_NO_WAIT) == 0) {
@@ -348,7 +363,9 @@ int tx_thread(void *arg0, void *arg1, void *arg2)
 							&scli, chan->channel_id, buf, chan->tx_msgq->msg_size);
 						if (ret < 0) {
 							LOG_ERR("[channel %s:%X] Failed to send data: %d",
-									chan->name, chan->channel_id, ret);
+									chan->name,
+									chan->channel_id,
+									ret);
 							disconnect(&scli);
 						}
 					}
@@ -408,11 +425,12 @@ int rx_thread(void *arg0, void *arg1, void *arg2)
 			}
 
 			uint32_t channel_id = sys_get_le32(hdr);
-			uint16_t data_len   = sys_get_le16(&hdr[4]);
+			uint16_t data_len	= sys_get_le16(&hdr[4]);
 
 			if (data_len > sizeof(buf)) {
 				LOG_ERR("RX: oversized frame (%u B) for channel 0x%08X – dropping",
-						data_len, channel_id);
+						data_len,
+						channel_id);
 				disconnect(&scli);
 				k_poll_signal_raise(&scli.rx_disconnect_signal, 0);
 				break;

@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #if CONFIG_COPRO_BUTTON
-#define BUTTON_IS_PRESSED()  board_button_is_pressed()
+#define BUTTON_IS_PRESSED() board_button_is_pressed()
 #else
 #define BUTTON_IS_PRESSED() 0
 #endif

@@ -1,4 +1,5 @@
 #include "zephyr/logging/log.h"
+
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 
@@ -19,8 +20,7 @@ static struct gpio_callback button_cb_data;
 
 bool button_pressed_flag;
 
-void button_pressed(const struct device *dev, struct gpio_callback *cb,
-		    uint32_t pins)
+void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 	LOG_INF("Button pressed at %" PRIu32, k_cycle_get_32());
 	button_pressed_flag = board_button_is_pressed();
@@ -39,7 +39,7 @@ int board_button_init(void)
 		return ret;
 	}
 
-    ret = gpio_pin_interrupt_configure_dt(&sw, GPIO_INT_EDGE_BOTH);
+	ret = gpio_pin_interrupt_configure_dt(&sw, GPIO_INT_EDGE_BOTH);
 	if (ret < 0) {
 		return ret;
 	}

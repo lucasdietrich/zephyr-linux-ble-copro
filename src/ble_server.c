@@ -3,16 +3,16 @@
 #include "stream_client.h"
 #include "zephyr/sys/byteorder.h"
 
-#include <device_control.h>
-
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_core.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/bluetooth/gatt.h>
+
+#include <device_control.h>
 
 K_MSGQ_DEFINE(ble_ctrl_tx_msgq,
 			  SC_TX_PAYLOAD_SIZE_BLE_CONTROL,
@@ -98,7 +98,8 @@ static const struct bt_data sd[] = {
 				  BT_UUID_128_ENCODE(0x539f0000, 0x43b5, 0x4c29, 0x9ea2, 0x99a56589ca60)),
 };
 
-/* Min Advertising Interval 500ms (800*0.625ms), max Advertising Interval 500.625ms (801*0.625ms) */
+/* Min Advertising Interval 500ms (800*0.625ms), max Advertising Interval 500.625ms
+ * (801*0.625ms) */
 #define BT_LE_ADV_CONN_PAIRING                                                           \
 	BT_LE_ADV_PARAM(                                                                     \
 		BT_LE_ADV_OPT_CONN, BT_GAP_ADV_FAST_INT_MIN_1, BT_GAP_ADV_FAST_INT_MAX_1, NULL)
@@ -144,7 +145,6 @@ static void advertising_start(void)
 	k_work_submit(&adv_work);
 }
 
-
 static void pairing_adv_timeout_handler(struct k_work *work)
 {
 	LOG_INF("Pairing advertising window expired");
@@ -183,7 +183,8 @@ static void adv_work_handler(struct k_work *work)
 	/* Always restrict connections to the accept list. New devices can only
 	 * connect during an explicit pairing window (BLE_CTRL_ACTION_ENABLE_PAIRING_ADV). */
 	LOG_INF("Advertising with accept list (%d bonded peer(s))", allowed_cnt);
-	err = bt_le_adv_start(BT_LE_ADV_CONN_ACCEPT_LIST, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	err = bt_le_adv_start(
+		BT_LE_ADV_CONN_ACCEPT_LIST, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 	if (err) {
 		LOG_ERR("Advertising failed to start (err %d)", err);
 		return;
@@ -195,19 +196,17 @@ static void adv_work_handler(struct k_work *work)
 static void idle_timeout_handler(struct k_work *work)
 {
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
-	struct conn_slot *slot = CONTAINER_OF(dwork, struct conn_slot, idle_work);
+	struct conn_slot *slot		   = CONTAINER_OF(dwork, struct conn_slot, idle_work);
 
 	if (slot->conn) {
-		LOG_WRN("BLE idle timeout (%ds), disconnecting",
-				CONFIG_COPRO_BLE_IDLE_TIMEOUT_S);
+		LOG_WRN("BLE idle timeout (%ds), disconnecting", CONFIG_COPRO_BLE_IDLE_TIMEOUT_S);
 		bt_conn_disconnect(slot->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	}
 }
 
 static void idle_timer_reset(struct conn_slot *slot)
 {
-	k_work_reschedule(&slot->idle_work,
-					  K_SECONDS(CONFIG_COPRO_BLE_IDLE_TIMEOUT_S));
+	k_work_reschedule(&slot->idle_work, K_SECONDS(CONFIG_COPRO_BLE_IDLE_TIMEOUT_S));
 }
 
 static void idle_timer_cancel(struct conn_slot *slot)
@@ -215,8 +214,14 @@ static void idle_timer_cancel(struct conn_slot *slot)
 	k_work_cancel_delayable(&slot->idle_work);
 }
 #else
-static inline void idle_timer_reset(struct conn_slot *slot) { (void)slot; }
-static inline void idle_timer_cancel(struct conn_slot *slot) { (void)slot; }
+static inline void idle_timer_reset(struct conn_slot *slot)
+{
+	(void)slot;
+}
+static inline void idle_timer_cancel(struct conn_slot *slot)
+{
+	(void)slot;
+}
 #endif
 
 static uint8_t firmware_flags;
@@ -233,7 +238,6 @@ static void stream_conn_cb(bool connected)
 	firmware_flags_notify();
 }
 #endif
-
 
 void on_connected(struct bt_conn *conn, uint8_t err)
 {
@@ -300,8 +304,7 @@ void on_security_changed(struct bt_conn *conn,
 		struct conn_slot *slot = conn_slot_find(conn);
 		if (slot) idle_timer_reset(slot);
 	} else {
-		LOG_INF("Security failed: %s level %u err %d\n", addr, level,
-			err);
+		LOG_INF("Security failed: %s level %u err %d\n", addr, level, err);
 		bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), false);
 	}
 }
@@ -339,16 +342,16 @@ void on_identity_resolved(struct bt_conn *conn,
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
-    .connected              = on_connected,
-    .disconnected           = on_disconnected,
-    .recycled               = on_recycled,
-	.security_changed 		= on_security_changed,
-	.identity_resolved 		= on_identity_resolved,
+	.connected		   = on_connected,
+	.disconnected	   = on_disconnected,
+	.recycled		   = on_recycled,
+	.security_changed  = on_security_changed,
+	.identity_resolved = on_identity_resolved,
 };
 
 static struct bt_conn_auth_cb conn_auth_callbacks = {
 	.passkey_display = auth_passkey_display,
-	.cancel = auth_cancel,
+	.cancel			 = auth_cancel,
 };
 
 #if defined(CONFIG_COPRO_DEVICE_CONTROL)
@@ -378,20 +381,26 @@ static void garage_flags_ccc_changed(const struct bt_gatt_attr *attr, uint16_t v
 	notify_flags_enabled = (value == BT_GATT_CCC_NOTIFY);
 }
 
-static ssize_t read_left_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-							  void *buf, uint16_t len, uint16_t offset)
+static ssize_t read_left_door(struct bt_conn *conn,
+							  const struct bt_gatt_attr *attr,
+							  void *buf,
+							  uint16_t len,
+							  uint16_t offset)
 {
 	LOG_DBG("Read left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
 
 	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
-	uint8_t val = (uint8_t)state.left_door;
+	uint8_t val							   = (uint8_t)state.left_door;
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
 }
 
-static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-							   const void *buf, uint16_t len,
-							   uint16_t offset, uint8_t flags)
+static ssize_t write_left_door(struct bt_conn *conn,
+							   const struct bt_gatt_attr *attr,
+							   const void *buf,
+							   uint16_t len,
+							   uint16_t offset,
+							   uint8_t flags)
 {
 	LOG_DBG("Write left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
 
@@ -411,20 +420,26 @@ static ssize_t write_left_door(struct bt_conn *conn, const struct bt_gatt_attr *
 	return len;
 }
 
-static ssize_t read_right_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-							   void *buf, uint16_t len, uint16_t offset)
+static ssize_t read_right_door(struct bt_conn *conn,
+							   const struct bt_gatt_attr *attr,
+							   void *buf,
+							   uint16_t len,
+							   uint16_t offset)
 {
 	LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
 
 	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
-	uint8_t val = (uint8_t)state.right_door;
+	uint8_t val							   = (uint8_t)state.right_door;
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
 }
 
-static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-								const void *buf, uint16_t len,
-								uint16_t offset, uint8_t flags)
+static ssize_t write_right_door(struct bt_conn *conn,
+								const struct bt_gatt_attr *attr,
+								const void *buf,
+								uint16_t len,
+								uint16_t offset,
+								uint8_t flags)
 {
 	LOG_DBG("Attribute write, handle: %u, conn: %p", attr->handle, (void *)conn);
 
@@ -442,53 +457,67 @@ static ssize_t write_right_door(struct bt_conn *conn, const struct bt_gatt_attr 
 	return len;
 }
 
-static ssize_t read_gate(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-						 void *buf, uint16_t len, uint16_t offset)
+static ssize_t read_gate(struct bt_conn *conn,
+						 const struct bt_gatt_attr *attr,
+						 void *buf,
+						 uint16_t len,
+						 uint16_t offset)
 {
 	LOG_DBG("Attribute read, handle: %u, conn: %p", attr->handle, (void *)conn);
 
 	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
-	uint8_t val = (uint8_t)state.gate;
+	uint8_t val							   = (uint8_t)state.gate;
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &val, sizeof(val));
 }
 
-static ssize_t read_flags(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-					  void *buf, uint16_t len, uint16_t offset)
+static ssize_t read_flags(struct bt_conn *conn,
+						  const struct bt_gatt_attr *attr,
+						  void *buf,
+						  uint16_t len,
+						  uint16_t offset)
 {
 	LOG_DBG("Read firmware flags, handle: %u, conn: %p", attr->handle, (void *)conn);
 
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &firmware_flags,
-							 sizeof(firmware_flags));
+	return bt_gatt_attr_read(
+		conn, attr, buf, len, offset, &firmware_flags, sizeof(firmware_flags));
 }
 
 BT_GATT_SERVICE_DEFINE(
-	garage_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_GARAGE_SERVICE),
+	garage_svc,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_GARAGE_SERVICE),
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_LEFT_DOOR,
 						   BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
 						   BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_AUTHEN,
-						   read_left_door, write_left_door, NULL),
+						   read_left_door,
+						   write_left_door,
+						   NULL),
 	BT_GATT_CCC(garage_left_door_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_RIGHT_DOOR,
 						   BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_INDICATE,
 						   BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_AUTHEN,
-						   read_right_door, write_right_door, NULL),
+						   read_right_door,
+						   write_right_door,
+						   NULL),
 	BT_GATT_CCC(garage_right_door_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_GATE,
 						   BT_GATT_CHRC_READ | BT_GATT_CHRC_INDICATE,
 						   BT_GATT_PERM_READ,
-						   read_gate, NULL, NULL),
+						   read_gate,
+						   NULL,
+						   NULL),
 	BT_GATT_CCC(garage_gate_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_GARAGE_FLAGS,
 						   BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 						   BT_GATT_PERM_READ,
-						   read_flags, NULL, NULL),
-	BT_GATT_CCC(garage_flags_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-);
+						   read_flags,
+						   NULL,
+						   NULL),
+	BT_GATT_CCC(garage_flags_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE), );
 
 static void garage_indicate_cb(struct bt_conn *conn,
 							   struct bt_gatt_indicate_params *params,
@@ -510,37 +539,39 @@ static void garage_doors_notify_state(const device_ctrl_garage_doors_state_t *st
 									  uint8_t changed)
 {
 	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_LEFT_DOOR) && indicate_left_door_enabled) {
-		garage_left_ind_val                = (uint8_t)state->left_door;
-		garage_left_ind_params.attr        = &garage_svc.attrs[2];
-		garage_left_ind_params.func        = garage_indicate_cb;
-		garage_left_ind_params.destroy     = NULL;
-		garage_left_ind_params.data        = &garage_left_ind_val;
-		garage_left_ind_params.len         = sizeof(garage_left_ind_val);
+		garage_left_ind_val			   = (uint8_t)state->left_door;
+		garage_left_ind_params.attr	   = &garage_svc.attrs[2];
+		garage_left_ind_params.func	   = garage_indicate_cb;
+		garage_left_ind_params.destroy = NULL;
+		garage_left_ind_params.data	   = &garage_left_ind_val;
+		garage_left_ind_params.len	   = sizeof(garage_left_ind_val);
 		bt_gatt_indicate(NULL, &garage_left_ind_params);
 	}
-	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR) && indicate_right_door_enabled) {
-		garage_right_ind_val               = (uint8_t)state->right_door;
-		garage_right_ind_params.attr       = &garage_svc.attrs[5];
-		garage_right_ind_params.func       = garage_indicate_cb;
-		garage_right_ind_params.destroy    = NULL;
-		garage_right_ind_params.data       = &garage_right_ind_val;
-		garage_right_ind_params.len        = sizeof(garage_right_ind_val);
+	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_RIGHT_DOOR) &&
+		indicate_right_door_enabled) {
+		garage_right_ind_val			= (uint8_t)state->right_door;
+		garage_right_ind_params.attr	= &garage_svc.attrs[5];
+		garage_right_ind_params.func	= garage_indicate_cb;
+		garage_right_ind_params.destroy = NULL;
+		garage_right_ind_params.data	= &garage_right_ind_val;
+		garage_right_ind_params.len		= sizeof(garage_right_ind_val);
 		bt_gatt_indicate(NULL, &garage_right_ind_params);
 	}
 	if ((changed & DEVICE_CTRL_GARAGE_CHANGED_GATE) && indicate_gate_enabled) {
-		garage_gate_ind_val                = (uint8_t)state->gate;
-		garage_gate_ind_params.attr        = &garage_svc.attrs[8];
-		garage_gate_ind_params.func        = garage_indicate_cb;
-		garage_gate_ind_params.destroy     = NULL;
-		garage_gate_ind_params.data        = &garage_gate_ind_val;
-		garage_gate_ind_params.len         = sizeof(garage_gate_ind_val);
+		garage_gate_ind_val			   = (uint8_t)state->gate;
+		garage_gate_ind_params.attr	   = &garage_svc.attrs[8];
+		garage_gate_ind_params.func	   = garage_indicate_cb;
+		garage_gate_ind_params.destroy = NULL;
+		garage_gate_ind_params.data	   = &garage_gate_ind_val;
+		garage_gate_ind_params.len	   = sizeof(garage_gate_ind_val);
 		bt_gatt_indicate(NULL, &garage_gate_ind_params);
 	}
 }
 
 /* Registered with device_control_set_state_cb(). Forwards the pre-computed
  * changed bitmask directly to the BLE indication function. */
-static void garage_state_cb(const device_ctrl_garage_doors_state_t *state, uint8_t changed)
+static void garage_state_cb(const device_ctrl_garage_doors_state_t *state,
+							uint8_t changed)
 {
 	garage_doors_notify_state(state, changed);
 }
@@ -613,18 +644,23 @@ static void ble_ctrl_rx_thread(void *a, void *b, void *c)
 	}
 }
 
-K_THREAD_DEFINE(ble_ctrl_rx_tid, 1024u,
-				ble_ctrl_rx_thread, NULL, NULL, NULL,
-				K_PRIO_PREEMPT(10), 0, SYS_FOREVER_MS);
+K_THREAD_DEFINE(ble_ctrl_rx_tid,
+				1024u,
+				ble_ctrl_rx_thread,
+				NULL,
+				NULL,
+				NULL,
+				K_PRIO_PREEMPT(10),
+				0,
+				SYS_FOREVER_MS);
 
 int ble_server_start(void)
 {
 	int ret;
 
 	/* Configure the stream client */
-	ret = stream_client_channel_add(SC_ID_BLE_CONTROL,
-									SC_NAME_BLE_CONTROL,
-								&ble_ctrl_tx_msgq, &ble_ctrl_rx_msgq);
+	ret = stream_client_channel_add(
+		SC_ID_BLE_CONTROL, SC_NAME_BLE_CONTROL, &ble_ctrl_tx_msgq, &ble_ctrl_rx_msgq);
 	if (ret < 0) {
 		LOG_ERR("Failed to add linky channel to stream client: %d", ret);
 		return ret;
@@ -670,7 +706,8 @@ int ble_server_start(void)
 	return 0;
 }
 
-static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, size_t buf_size)
+static void
+bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, size_t buf_size)
 {
 	if (buf_size < sizeof(struct ble_ctrl_tx_msg)) {
 		LOG_ERR("Buffer too small for serialization");
@@ -683,30 +720,35 @@ static void bt_ctrl_msg_serialize(struct ble_ctrl_tx_msg *msg, uint8_t *buf, siz
 	buf[4] = msg->addr.type;
 	memcpy(&buf[5], &msg->addr.a.val, sizeof(msg->addr.a.val));
 	switch (msg->cmd) {
-		case BLE_CTRL_EVENT_PAIRING_CODE:
-			sys_put_le32(msg->param.pairing_code.passkey, &buf[4 + sizeof(bt_addr_le_t)]);
-			break;
-		case BLE_CTRL_EVENT_PAIRING_RESULT:
-			buf[4 + sizeof(bt_addr_le_t)] = msg->param.pairing_result.success ? 0x00 : 0x01;
-			break;
-		case BLE_CTRL_EVENT_IDENTITY_RESOLVED:
-			memcpy(&buf[4 + sizeof(bt_addr_le_t)], &msg->param.identity_resolved.rpa, sizeof(bt_addr_le_t));
-			memcpy(&buf[4 + 2*sizeof(bt_addr_le_t)], &msg->param.identity_resolved.identity, sizeof(bt_addr_le_t));
-			break;
-		case BLE_CTRL_EVENT_PAIRING_ADV_STARTED:
-			sys_put_le32(msg->param.pairing_adv_started.duration_s, &buf[4 + sizeof(bt_addr_le_t)]);
-			break;
-		case BLE_CTRL_EVENT_PAIRING_ADV_STOPPED:
-			/* No additional parameters */
-			break;
-		case BLE_CTRL_EVENT_CONNECTED:
-		case BLE_CTRL_EVENT_DISCONNECTED:
-		case BLE_CTRL_EVENT_ALL_BONDS_REMOVED:
-			/* No additional parameters */
-			break;
-		default:
-			LOG_ERR("Unknown command: %u", msg->cmd);
-			break;
+	case BLE_CTRL_EVENT_PAIRING_CODE:
+		sys_put_le32(msg->param.pairing_code.passkey, &buf[4 + sizeof(bt_addr_le_t)]);
+		break;
+	case BLE_CTRL_EVENT_PAIRING_RESULT:
+		buf[4 + sizeof(bt_addr_le_t)] = msg->param.pairing_result.success ? 0x00 : 0x01;
+		break;
+	case BLE_CTRL_EVENT_IDENTITY_RESOLVED:
+		memcpy(&buf[4 + sizeof(bt_addr_le_t)],
+			   &msg->param.identity_resolved.rpa,
+			   sizeof(bt_addr_le_t));
+		memcpy(&buf[4 + 2 * sizeof(bt_addr_le_t)],
+			   &msg->param.identity_resolved.identity,
+			   sizeof(bt_addr_le_t));
+		break;
+	case BLE_CTRL_EVENT_PAIRING_ADV_STARTED:
+		sys_put_le32(msg->param.pairing_adv_started.duration_s,
+					 &buf[4 + sizeof(bt_addr_le_t)]);
+		break;
+	case BLE_CTRL_EVENT_PAIRING_ADV_STOPPED:
+		/* No additional parameters */
+		break;
+	case BLE_CTRL_EVENT_CONNECTED:
+	case BLE_CTRL_EVENT_DISCONNECTED:
+	case BLE_CTRL_EVENT_ALL_BONDS_REMOVED:
+		/* No additional parameters */
+		break;
+	default:
+		LOG_ERR("Unknown command: %u", msg->cmd);
+		break;
 	}
 }
 
@@ -720,9 +762,9 @@ static int bt_ctrl_msg_enqueue(struct ble_ctrl_tx_msg *msg)
 int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_EVENT_PAIRING_CODE,
-		.addr = *addr,
-		.param = { .pairing_code = { .passkey = passkey } },
+		.cmd   = BLE_CTRL_EVENT_PAIRING_CODE,
+		.addr  = *addr,
+		.param = {.pairing_code = {.passkey = passkey}},
 	};
 	return bt_ctrl_msg_enqueue(&msg);
 }
@@ -730,9 +772,9 @@ int bt_ctrl_msg_send_pairing_code(const bt_addr_le_t *addr, uint32_t passkey)
 int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_EVENT_PAIRING_RESULT,
-		.addr = *addr,
-		.param = { .pairing_result = { .success = success } },
+		.cmd   = BLE_CTRL_EVENT_PAIRING_RESULT,
+		.addr  = *addr,
+		.param = {.pairing_result = {.success = success}},
 	};
 	return bt_ctrl_msg_enqueue(&msg);
 }
@@ -740,7 +782,7 @@ int bt_ctrl_msg_send_pairing_result(const bt_addr_le_t *addr, bool success)
 int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_EVENT_CONNECTED,
+		.cmd  = BLE_CTRL_EVENT_CONNECTED,
 		.addr = *addr,
 	};
 	return bt_ctrl_msg_enqueue(&msg);
@@ -749,7 +791,7 @@ int bt_ctrl_msg_send_connected(const bt_addr_le_t *addr)
 int bt_ctrl_msg_send_disconnected(const bt_addr_le_t *addr)
 {
 	struct ble_ctrl_tx_msg msg = {
-		.cmd = BLE_CTRL_EVENT_DISCONNECTED,
+		.cmd  = BLE_CTRL_EVENT_DISCONNECTED,
 		.addr = *addr,
 	};
 	return bt_ctrl_msg_enqueue(&msg);

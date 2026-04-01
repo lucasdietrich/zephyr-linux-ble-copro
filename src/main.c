@@ -5,19 +5,20 @@
  */
 
 #include "ble_server.h"
+
 #include <complex.h>
 
+#include <zephyr/app_version.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/usb/usb_device.h>
 #include <zephyr/settings/settings.h>
-#include <zephyr/app_version.h>
+#include <zephyr/usb/usb_device.h>
 
 #include <ble_observer.h>
-#include <led.h>
 #include <button.h>
 #include <device_control.h>
+#include <led.h>
 #include <linky.h>
 #include <stream_client.h>
 #include <usb_net.h>
@@ -90,8 +91,7 @@ int main(void)
 
 #if CONFIG_COPRO_XIAOMI_LYWSD03MMC
 	/* Configure the stream client */
-	ret = stream_client_channel_add(
-		SC_ID_XIAOMI, SC_NAME_XIAOMI, &xiaomi_msgq, NULL);
+	ret = stream_client_channel_add(SC_ID_XIAOMI, SC_NAME_XIAOMI, &xiaomi_msgq, NULL);
 	if (ret < 0) {
 		LOG_ERR("Failed to add xiaomi channel to stream client: %d", ret);
 		return ret;
@@ -100,8 +100,8 @@ int main(void)
 
 #if CONFIG_COPRO_LINKY_TIC
 	/* Configure the stream client */
-	ret = stream_client_channel_add(
-		SC_ID_LINKY_TIC, SC_NAME_LINKY_TIC, &linky_msgq, NULL);
+	ret =
+		stream_client_channel_add(SC_ID_LINKY_TIC, SC_NAME_LINKY_TIC, &linky_msgq, NULL);
 	if (ret < 0) {
 		LOG_ERR("Failed to add linky channel to stream client: %d", ret);
 		return ret;
