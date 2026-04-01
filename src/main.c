@@ -12,6 +12,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/settings/settings.h>
+#include <zephyr/app_version.h>
 
 #include <ble_observer.h>
 #include <led.h>
@@ -27,6 +28,8 @@ LOG_MODULE_REGISTER(ble, LOG_LEVEL_INF);
 int main(void)
 {
 	int ret;
+
+	printf("\nStarting BLE Co-Processor firmware %s\n", APP_VERSION_STRING);
 
 #if CONFIG_COPRO_LED
 	/* Led initialization */

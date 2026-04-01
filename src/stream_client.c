@@ -3,6 +3,8 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/sys/byteorder.h>
 
+#include <zephyr/app_version.h>
+
 #include <led.h>
 #include <stream_client.h>
 
@@ -149,6 +151,9 @@ void stream_client_set_conn_cb(stream_client_conn_cb_t cb)
 	scli.conn_cb = cb;
 }
 
+static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t len);
+static void send_control_firmware_version(scli_t *s);
+
 static int try_connect(scli_t *s)
 {
 	int ret, sock;
@@ -192,6 +197,8 @@ static int try_connect(scli_t *s)
 		s->conn_cb(true);
 	}
 
+	send_control_firmware_version(s);
+
 #if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
 	/* Reset stale disconnect signal, then wake the RX thread */
 	k_poll_signal_reset(&s->rx_disconnect_signal);
@@ -231,6 +238,35 @@ static int disconnect(scli_t *s)
  *  - 2 bytes: data length
  *  - N bytes: data
  */
+
+#define CTRL_MSG_FIRMWARE_VERSION 0x01u
+
+/**
+ * @brief Send the firmware version on the control channel.
+ *
+ * Wire layout:
+ *   byte 0: message type (CTRL_MSG_FIRMWARE_VERSION = 0x01)
+ *   byte 1: major
+ *   byte 2: minor
+ *   byte 3: patch
+ */
+static void send_control_firmware_version(scli_t *s)
+{
+	uint8_t buf[4u] = {
+		CTRL_MSG_FIRMWARE_VERSION,
+		APP_VERSION_MAJOR,
+		APP_VERSION_MINOR,
+		APP_PATCHLEVEL,
+	};
+
+	int ret = channel_send_data(s, CHANNEL_CONTROL_ID, buf, sizeof(buf));
+	if (ret < 0) {
+		LOG_ERR("Failed to send firmware version: %d", ret);
+	} else {
+		LOG_INF("Firmware version %d.%d.%d sent on control channel",
+				APP_VERSION_MAJOR, APP_VERSION_MINOR, APP_PATCHLEVEL);
+	}
+}
 
 static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t len)
 {
