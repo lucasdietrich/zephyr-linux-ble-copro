@@ -109,12 +109,49 @@ config COPRO_STREAM_CHANNELS_COUNT
       The number of channels to use for the Streams.
 
 config COPRO_STREAM_CHANNEL_MSG_MAX_SIZE
-    int "Stream Channel Message Max Size"
+    int "Stream Channel (SC) Message Max Size"
     default 128
     help
       The maximum size of the message to send to the Stream Client.
 
+config COPRO_STREAM_CHANNEL_RX
+    bool "Enable RX (server-to-device) channel support"
+    default n
+    help
+      When enabled, a dedicated RX thread is started. It reads incoming
+      frames from the server and dispatches each payload to the rx_msgq
+      of the matching channel (if one was registered). Disable this to
+      reduce flash and RAM when bidirectional communication is not needed.
+
 endif # COPRO_STREAM_CLIENT
+
+menuconfig COPRO_DEVICE_CONTROL
+    bool "Device Control channel"
+    default n
+    depends on COPRO_STREAM_CLIENT
+    select COPRO_STREAM_CHANNEL_RX
+    help
+      Enables the device-control stream channel.  Commands (e.g. open
+      garage door) are sent from the device to the server, and state
+      updates (e.g. garage-door positions) are received from the server.
+
+if COPRO_DEVICE_CONTROL
+
+config COPRO_DEVICE_CONTROL_CMD_QUEUE_SIZE
+    int "Command queue size"
+    default 8
+    help
+      Number of outgoing command messages that can be buffered before the
+      TX thread drains them.
+
+config COPRO_DEVICE_CONTROL_STATE_QUEUE_SIZE
+    int "State queue size"
+    default 8
+    help
+      Number of incoming state messages that can be buffered before the
+      application reads them.
+
+endif # COPRO_DEVICE_CONTROL
 
 menuconfig COPRO_CONFIG_SERVER
     bool "Coprocessor configuration server"
@@ -132,6 +169,24 @@ config COPRO_CONFIG_PORT
       The port number to use for the Configuration Server.
 
 endif # COPRO_CONFIG_SERVER
+
+menuconfig COPRO_BLE_SERVER
+    bool "Coprocessor BLE Server"
+    default n
+    help
+      This option allows you to expose services from the coprocessor as a BLE server.
+
+if COPRO_BLE_SERVER
+
+config COPRO_BLE_IDLE_TIMEOUT_S
+    int "BLE idle connection timeout (seconds)"
+    default 30
+    help
+      Disconnect a BLE connection that has been idle for this many seconds.
+      Idle means no authenticated GATT write or security-level upgrade has
+      been received. Set to 0 to disable the timeout entirely.
+
+endif # COPRO_BLE_SERVER
 
 menu "Zephyr RTOS Configuration"
 

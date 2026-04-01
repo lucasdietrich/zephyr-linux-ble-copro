@@ -1,12 +1,14 @@
 use thiserror::Error;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use crate::ble_control::BleControlHandler;
 use crate::control_channel::ControlHandler;
+use crate::device_control::DeviceControlHandler;
 use crate::linky::LinkyTicHandler;
 use crate::stream_message::{ChannelMessage, MessageHeader};
 use crate::xiaomi::XiaomiHandler;
-use crate::StreamChannelHandler;
+use crate::{StreamChannelHandler, StreamChannelIndication};
 
 pub struct StreamChannel {
     stream: TcpStream,
@@ -20,8 +22,8 @@ pub enum StreamChannelError {
     InvalidMessageData,
     #[error("Invalid message Length")]
     InvalidMessageLength,
-    #[error("Unhandled channel ID")]
-    UnhandledChannelId,
+    #[error("Unhandled channel ID: {0}")]
+    UnhandledChannelId(u32),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -69,7 +71,30 @@ impl StreamChannel {
             ControlHandler::CHANNEL_ID => {
                 ControlHandler::parse_message(data).map(ChannelMessage::Control)
             }
-            _ => Err(StreamChannelError::UnhandledChannelId),
+            BleControlHandler::CHANNEL_ID => {
+                BleControlHandler::parse_message(data).map(ChannelMessage::BleControl)
+            }
+            DeviceControlHandler::CHANNEL_ID => {
+                DeviceControlHandler::parse_message(data).map(ChannelMessage::DeviceControl)
+            }
+            _ => Err(StreamChannelError::UnhandledChannelId(header.channel_id)),
         }
+    }
+
+    pub async fn send_indication<I: StreamChannelIndication>(
+        &mut self,
+        indication: I,
+    ) -> Result<(), StreamChannelError> {
+        let data = indication.serialize_indication();
+        let header = MessageHeader::new(I::CHANNEL_ID, data.len() as u16);
+
+        let mut buf = Vec::with_capacity(6 + data.len());
+        buf.extend_from_slice(&header.channel_id.to_le_bytes());
+        buf.extend_from_slice(&header.message_len.to_le_bytes());
+        buf.extend_from_slice(&data);
+
+        self.stream.write_all(&buf).await?;
+
+        Ok(())
     }
 }

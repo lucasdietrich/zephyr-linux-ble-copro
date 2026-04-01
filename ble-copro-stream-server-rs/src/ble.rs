@@ -28,6 +28,21 @@ pub struct BleAddress {
 }
 
 impl BleAddress {
+    pub fn from_raw(addr: &[u8]) -> Option<BleAddress> {
+        if addr.len() != 7 {
+            return None;
+        }
+        let ble_type = match addr[0] {
+            0 => BleType::Public,
+            1 => BleType::Random,
+            2 => BleType::PublicStatic,
+            3 => BleType::RandomStatic,
+            _ => BleType::Unknown,
+        };
+        let mac = [addr[1], addr[2], addr[3], addr[4], addr[5], addr[6]];
+        Some(BleAddress { mac, ble_type })
+    }
+
     pub fn new(mac: [u8; 6], ble_type: u8) -> BleAddress {
         let ble_type = match ble_type {
             0 => BleType::Public,
@@ -43,19 +58,26 @@ impl BleAddress {
     pub fn mac_string(&self) -> String {
         format!(
             "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.mac[0], self.mac[1], self.mac[2], self.mac[3], self.mac[4], self.mac[5]
+            self.mac[5], self.mac[4], self.mac[3], self.mac[2], self.mac[1], self.mac[0]
         )
     }
 
     pub fn to_slug(&self) -> String {
         format!(
             "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            self.mac[0], self.mac[1], self.mac[2], self.mac[3], self.mac[4], self.mac[5]
+            self.mac[5], self.mac[4], self.mac[3], self.mac[2], self.mac[1], self.mac[0]
         )
     }
 
     pub fn mac_manufacturer_part(&self) -> String {
-        format!("{:02x}{:02x}{:02x}", self.mac[3], self.mac[4], self.mac[5])
+        format!("{:02x}{:02x}{:02x}", self.mac[5], self.mac[4], self.mac[3])
+    }
+
+    pub(crate) fn serialize(&self) -> [u8; 7] {
+        let mut data = [0u8; 7];
+        data[0] = self.ble_type as u8;
+        data[1..7].copy_from_slice(&self.mac);
+        data
     }
 }
 

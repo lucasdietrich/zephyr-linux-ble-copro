@@ -14,7 +14,19 @@
 
 int stream_client_start(void);
 
-int stream_client_channel_add(uint32_t channel_id, const char *name, struct k_msgq *msgq);
+bool stream_client_is_connected(void);
+
+/**
+ * @brief Callback invoked when the TCP stream server connection state changes.
+ *
+ * @param connected true when a connection is established, false on disconnect.
+ */
+typedef void (*stream_client_conn_cb_t)(bool connected);
+
+void stream_client_set_conn_cb(stream_client_conn_cb_t cb);
+
+int stream_client_channel_add(uint32_t channel_id, const char *name,
+							   struct k_msgq *tx_msgq, struct k_msgq *rx_msgq);
 
 int stream_try_connect(void);
 

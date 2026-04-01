@@ -127,13 +127,13 @@ int xiaomi_record_serialize(const xiaomi_record_t *xc, uint8_t *buf, size_t len)
 		return -ENOMEM;
 	}
 
-	buf[0] = xc->addr.a.val[5];
-	buf[1] = xc->addr.a.val[4];
-	buf[2] = xc->addr.a.val[3];
+	buf[0] = xc->addr.type;
+	buf[1] = xc->addr.a.val[0];
+	buf[2] = xc->addr.a.val[1];
 	buf[3] = xc->addr.a.val[2];
-	buf[4] = xc->addr.a.val[1];
-	buf[5] = xc->addr.a.val[0];
-	buf[6] = xc->addr.type;
+	buf[4] = xc->addr.a.val[3];
+	buf[5] = xc->addr.a.val[4];
+	buf[6] = xc->addr.a.val[5];
 	buf[7] = xc->measurements.rssi;
 	buf[8] = XIAOMI_RECORD_HEADER_VERSION;
 	sys_put_le64(xc->timestamp, &buf[9]);

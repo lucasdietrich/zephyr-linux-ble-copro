@@ -75,13 +75,13 @@ int linky_record_serialize(const linky_tic_record_t *lc, uint8_t *buf, size_t le
 	 *  - 64 bytes: raw TIC data
 	 */
 
-	buf[0] = lc->addr.a.val[5];
-	buf[1] = lc->addr.a.val[4];
-	buf[2] = lc->addr.a.val[3];
+	buf[0] = lc->addr.type;
+	buf[1] = lc->addr.a.val[0];
+	buf[2] = lc->addr.a.val[1];
 	buf[3] = lc->addr.a.val[2];
-	buf[4] = lc->addr.a.val[1];
-	buf[5] = lc->addr.a.val[0];
-	buf[6] = lc->addr.type;
+	buf[4] = lc->addr.a.val[3];
+	buf[5] = lc->addr.a.val[4];
+	buf[6] = lc->addr.a.val[5];
 	buf[7] = lc->rssi;
 	buf[8] = 0x01; // Header version
 	sys_put_le32(lc->flags, &buf[9]);

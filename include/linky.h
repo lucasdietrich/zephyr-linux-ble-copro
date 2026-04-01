@@ -16,8 +16,8 @@
 
 #define LINKY_TIC_RAW_BUFFER_SIZE 64u
 
-#define STREAM_CHANNEL_NAME_LINKY_TIC "linky-tic-measurements"
-#define STREAM_CHANNEL_ID_LINKY_TIC	  0xCD1F14BDlu
+#define SC_NAME_LINKY_TIC "linky-tic-measurements"
+#define SC_ID_LINKY_TIC	  0xCD1F14BDlu
 
 #define LINKY_RECORD_FLAG_VALID BIT(0)
 

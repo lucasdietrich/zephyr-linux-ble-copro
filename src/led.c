@@ -42,3 +42,8 @@ int board_led_off(void)
 {
 	return gpio_pin_set_dt(&led, 0);
 }
+
+int board_led_set(bool on)
+{
+	return gpio_pin_set_dt(&led, on ? 1 : 0);
+}
