@@ -8,7 +8,7 @@
 /* The devicetree node identifier for the "sw0" alias. */
 #define SW_NODE DT_ALIAS(sw0)
 
-LOG_MODULE_REGISTER(button, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(button, LOG_LEVEL_WRN);
 
 /*
  * A build error on this line means your board is unsupported.
