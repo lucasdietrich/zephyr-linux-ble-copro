@@ -41,11 +41,13 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_COPRO_BUTTON
 	ret = board_button_init();
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize button (ret %d)", ret);
 		return ret;
 	}
+#endif
 
 #if CONFIG_COPRO_USB_NETWORK
 	/* Initialize NET interface management */

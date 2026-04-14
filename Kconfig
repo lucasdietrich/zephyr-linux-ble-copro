@@ -4,6 +4,13 @@ config COPRO_LED
     help
       This option allows you to use the LED.
 
+menuconfig COPRO_BUTTON
+    bool "Button support"
+    default n
+    help
+      Enable support for the board button referenced by the devicetree
+      alias sw0.
+
 menuconfig COPRO_USB_NETWORK
     bool "USB Network Configuration"
     default y
