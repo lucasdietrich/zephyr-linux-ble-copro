@@ -24,7 +24,7 @@ K_MSGQ_DEFINE(ble_ctrl_rx_msgq,
 			  SC_RX_MSG_QUEUE_SIZE_BLE_CONTROL,
 			  4);
 
-LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_WRN);
+LOG_MODULE_REGISTER(ble_server, LOG_LEVEL_INF);
 
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -387,7 +387,7 @@ static ssize_t read_left_door(struct bt_conn *conn,
 							  uint16_t len,
 							  uint16_t offset)
 {
-	LOG_DBG("Read left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
+	LOG_INF("Read left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
 
 	device_ctrl_garage_doors_state_t state = device_control_get_garage_doors_state();
 	uint8_t val							   = (uint8_t)state.left_door;
@@ -402,7 +402,7 @@ static ssize_t write_left_door(struct bt_conn *conn,
 							   uint16_t offset,
 							   uint8_t flags)
 {
-	LOG_DBG("Write left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
+	LOG_INF("Write left door state, handle: %u, conn: %p", attr->handle, (void *)conn);
 
 	if (len != 1U || offset != 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
@@ -523,7 +523,7 @@ static void garage_indicate_cb(struct bt_conn *conn,
 							   struct bt_gatt_indicate_params *params,
 							   uint8_t err)
 {
-	LOG_DBG("Garage indication %s", err != 0U ? "fail" : "success");
+	LOG_INF("Garage indication %s", err != 0U ? "fail" : "success");
 }
 
 /* Static params + value buffers — must outlive the ATT confirmation. */
