@@ -4,6 +4,18 @@ config COPRO_LED
     help
       This option allows you to use the LED.
 
+config COPRO_DFU
+    bool "DFU trigger support"
+    depends on BOOTLOADER_MCUBOOT
+    depends on RETENTION_BOOT_MODE
+    depends on IMG_MANAGER
+    default y if BOOTLOADER_MCUBOOT
+    help
+      Enables the DFU trigger module. When called, it sets the boot mode
+      to BOOTLOADER via the retention subsystem and reboots into MCUboot
+      serial recovery mode. Also confirms the current image on startup so
+      MCUboot does not revert it.
+
 menuconfig COPRO_BUTTON
     bool "Button support"
     default n

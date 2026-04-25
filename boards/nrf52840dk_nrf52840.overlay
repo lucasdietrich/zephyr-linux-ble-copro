@@ -1,0 +1,12 @@
+/*
+ * Application overlay for nrf52840dk/nrf52840
+ *
+ * Expose the GPREGRET1 retention node as zephyr,boot-mode so the
+ * application can signal MCUboot to enter serial recovery mode.
+ */
+
+/ {
+	chosen {
+		zephyr,boot-mode = &boot_mode0;
+	};
+};

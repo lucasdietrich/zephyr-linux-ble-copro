@@ -1,0 +1,17 @@
+/*
+ * MCUboot overlay for nrf52840dk/nrf52840
+ *
+ * - Point zephyr,boot-mode at the GPREGRET1 retention node so MCUboot
+ *   can read the boot-mode flag written by the application.
+ * - Point mcuboot-led0 at led0 for DFU-mode LED indication.
+ */
+
+/ {
+	chosen {
+		zephyr,boot-mode = &boot_mode0;
+	};
+
+	aliases {
+		mcuboot-led0 = &led0;
+	};
+};
