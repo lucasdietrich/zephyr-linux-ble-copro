@@ -1,5 +1,4 @@
 SN = 683339521
-RUNNER = jlink
 TARGET= rpi3dev
 
 .PHONY: build flash_sn flash monitor clean
@@ -13,7 +12,7 @@ bl654:
 	west build -b bl654_usb
 
 flash:
-	west -v flash --runner=$(RUNNER)
+	west -v flash --openocd /usr/bin/openocd
 
 debug:
 	west debugserver
@@ -22,7 +21,7 @@ menuconfig:
 	west build -t menuconfig
 
 flash_sn:
-	west -v flash -r nrfjprog --snr $(SN) --runner=$(RUNNER)
+	west -v flash -r nrfjprog --snr $(SN) --openocd /usr/bin/openocd
 
 monitor:
 	python3 -m serial.tools.miniterm --eol LF --raw /dev/ttyACM0 115200
@@ -43,6 +42,3 @@ format:
 
 clean:
 	rm -rf build
-
-rust:
-	cargo build --target=

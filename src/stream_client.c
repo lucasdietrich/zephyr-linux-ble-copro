@@ -1,8 +1,12 @@
+#include <zephyr/logging/log.h>
 #include <zephyr/app_version.h>
 #include <zephyr/kernel.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/sys/byteorder.h>
+
+#include <zephyr/posix/sys/socket.h>
+#include <zephyr/posix/unistd.h>
 
 #include <led.h>
 #include <stream_client.h>

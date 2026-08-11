@@ -6,6 +6,8 @@ if(NOT DEFINED BOARD)
     set(BOARD "nrf52840dk/nrf52840")
 endif()
 
+set(BOARD_FLASH_RUNNER openocd)
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zephyr-linux-ble-copro)
 
