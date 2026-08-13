@@ -13,6 +13,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
+
 #include <zephyr/usb/usb_device.h>
 
 #include <ble_observer.h>
@@ -58,7 +59,7 @@ int main(void)
 	/* Initialize the USB Subsystem */
 	ret = usb_enable(NULL);
 	if (ret != 0) {
-		LOG_ERR("Failed to enable USB (red %d)", ret);
+		LOG_ERR("Failed to enable USB (ret %d)", ret);
 		return ret;
 	}
 

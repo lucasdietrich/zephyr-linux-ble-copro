@@ -66,6 +66,13 @@ messages.
    cd zephyr-linux-ble-copro
    ```
 
+4. Create `.env`
+
+  ```bash
+  source ../.venv/bin/activate
+  export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+  ```
+
 ### Build and Flash
 
 Build and flash for `nrf52840dk`

@@ -123,9 +123,8 @@ bool xiaomi_bt_data_parse(const bt_addr_le_t *addr,
 
 int xiaomi_record_serialize(const xiaomi_record_t *xc, uint8_t *buf, size_t len)
 {
-	if (len < XIAOMI_RECORD_BUF_SIZE) {
+	if (len < XIAOMI_RECORD_BUF_SIZE)
 		return -ENOMEM;
-	}
 
 	buf[0] = xc->addr.type;
 	buf[1] = xc->addr.a.val[0];

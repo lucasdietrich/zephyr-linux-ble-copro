@@ -54,6 +54,17 @@ Reload udev rules:
 sudo udevadm control --reload
 ```
 
+Allow firewall to accept traffic on the interface:
+
+```
+sudo ufw allow in on zeth0 to any port 4000 proto tcp
+```
+
+Or
+```
+sudo ufw allow in on zeth0
+```
+
 ## Expected result
 
 Interface should look like this:

@@ -1,7 +1,5 @@
 use ble_copro_stream_server::{
-    device_control::{DeviceCtrlCmd, DeviceCtrlStateMsg, DoorState, GarageDoorsState},
-    stream_message::ChannelMessage,
-    StreamChannelError, StreamServer,
+    StreamChannelError, StreamServer, control_channel::ControlMessage, device_control::{DeviceCtrlCmd, DeviceCtrlStateMsg, DoorState, GarageDoorsState}, stream_message::ChannelMessage,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -81,8 +79,8 @@ async fn main() {
                                 .expect("Failed to send indication");
                         }
                     }
-                    _ => {
-                        eprintln!("Unhandled message");
+                    ChannelMessage::Control(ControlMessage::FirmwareVersion(version)) => {
+                        println!("Control message: firmware version: {}", version);
                     }
                 },
                 Err(StreamChannelError::UnhandledChannelId(channel_id)) => {

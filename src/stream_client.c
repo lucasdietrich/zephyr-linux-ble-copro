@@ -1,7 +1,10 @@
 #include <zephyr/app_version.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
+#include <zephyr/posix/sys/socket.h>
+#include <zephyr/posix/unistd.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <led.h>
@@ -81,14 +84,12 @@ int stream_client_channel_add(uint32_t channel_id,
 {
 	int i;
 
-	if (scli.state != STREAM_UNINITIALIZED) {
+	if (scli.state != STREAM_UNINITIALIZED)
 		return -EALREADY;
-	}
 
-	if (channel_id == CHANNEL_CONTROL_ID) {
-		/* Reserved channel id */
+	/* Reserved channel id */
+	if (channel_id == CHANNEL_CONTROL_ID)
 		return -EINVAL;
-	}
 
 	if (channel_id == 0 || tx_msgq == NULL || name == NULL || tx_msgq->msg_size == 0 ||
 		tx_msgq->msg_size > CONFIG_COPRO_STREAM_CHANNEL_MSG_MAX_SIZE) {
@@ -178,9 +179,8 @@ static int try_connect(scli_t *s)
 	__ASSERT_NO_MSG(s);
 
 	ret = net_addr_pton(AF_INET, CONFIG_COPRO_STREAM_HOST, &addr.sin_addr);
-	if (ret < 0) {
+	if (ret < 0)
 		return ret;
-	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_port	= htons(CONFIG_COPRO_STREAM_PORT);
@@ -203,15 +203,12 @@ static int try_connect(scli_t *s)
 	LED_ON();
 
 	/* Discard messages that accumulated while disconnected – they are stale. */
-	for (int i = 0; i < s->channels_count; i++) {
-		k_msgq_purge(s->channels[i].tx_msgq);
-	}
+	for (int i = 0; i < s->channels_count; i++) k_msgq_purge(s->channels[i].tx_msgq);
 
 	LOG_INF("Connected to %s:%d", CONFIG_COPRO_STREAM_HOST, CONFIG_COPRO_STREAM_PORT);
 
-	if (s->conn_cb) {
+	if (s->conn_cb)
 		s->conn_cb(true);
-	}
 
 	send_control_firmware_version(s);
 
@@ -242,9 +239,8 @@ static int disconnect(scli_t *s)
 	}
 	k_mutex_unlock(&s->conn_mutex);
 
-	if (notify && s->conn_cb) {
+	if (notify && s->conn_cb)
 		s->conn_cb(false);
-	}
 
 	return 0;
 }
@@ -290,9 +286,8 @@ static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t 
 {
 	int ret;
 
-	if (s->state != STREAM_CONNECTED) {
+	if (s->state != STREAM_CONNECTED)
 		return -ENOTCONN;
-	}
 
 	// Prepare the header
 	char buf_hdr[6u];
@@ -317,6 +312,17 @@ static int channel_send_data(scli_t *s, uint32_t channel_id, void *data, size_t 
 	return 0;
 }
 
+/* Poll TX msgqs (slots 0..channels_count-1) plus the RX-disconnect
+ * signal (slot channels_count). */
+static inline size_t get_poll_events_count(scli_t *s)
+{
+#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
+	return s->channels_count + 1; /* +1 for the RX-disconnect signal slot */
+#else
+	return s->channels_count;
+#endif
+}
+
 int tx_thread(void *arg0, void *arg1, void *arg2)
 {
 	int ret;
@@ -325,18 +331,11 @@ int tx_thread(void *arg0, void *arg1, void *arg2)
 	for (;;) {
 		switch (scli.state) {
 		case STREAM_DISCONNECTED:
-			if (try_connect(&scli)) {
+			if (try_connect(&scli))
 				k_sleep(K_MSEC(CONFIG_COPRO_STREAM_TRY_CONNECT_INTERVAL));
-			}
 			break;
 		case STREAM_CONNECTED:
-#if defined(CONFIG_COPRO_STREAM_CHANNEL_RX)
-			/* Poll TX msgqs (slots 0..channels_count-1) plus the RX-disconnect
-			 * signal (slot channels_count). */
-			ret = k_poll(scli.poll_events, scli.channels_count + 1, K_FOREVER);
-#else
-			ret = k_poll(scli.poll_events, scli.channels_count, K_FOREVER);
-#endif
+			ret = k_poll(scli.poll_events, get_poll_events_count(&scli), K_FOREVER);
 			if (ret < 0 && ret != -EAGAIN) {
 				LOG_ERR("Failed to poll: %d", ret);
 				disconnect(&scli);
@@ -355,19 +354,20 @@ int tx_thread(void *arg0, void *arg1, void *arg2)
 
 			for (int i = 0; i < scli.channels_count && scli.state == STREAM_CONNECTED;
 				 i++) {
-				if (scli.poll_events[i].state == K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
-					chan_t *chan = &scli.channels[i];
+				if (scli.poll_events[i].state != K_POLL_STATE_MSGQ_DATA_AVAILABLE)
+					continue;
 
-					if (k_msgq_get(chan->tx_msgq, (void *)buf, K_NO_WAIT) == 0) {
-						ret = channel_send_data(
-							&scli, chan->channel_id, buf, chan->tx_msgq->msg_size);
-						if (ret < 0) {
-							LOG_ERR("[channel %s:%X] Failed to send data: %d",
-									chan->name,
-									chan->channel_id,
-									ret);
-							disconnect(&scli);
-						}
+				chan_t *chan = &scli.channels[i];
+
+				if (k_msgq_get(chan->tx_msgq, (void *)buf, K_NO_WAIT) == 0) {
+					ret = channel_send_data(
+						&scli, chan->channel_id, buf, chan->tx_msgq->msg_size);
+					if (ret < 0) {
+						LOG_ERR("[channel %s:%X] Failed to send data: %d",
+								chan->name,
+								chan->channel_id,
+								ret);
+						disconnect(&scli);
 					}
 				}
 			}
@@ -389,13 +389,11 @@ static int recv_all(int sock, void *buf, size_t len)
 
 	while (received < len) {
 		int ret = recv(sock, (uint8_t *)buf + received, len - received, 0);
-
-		if (ret == 0) {
+		if (ret == 0)
 			return -ECONNRESET;
-		}
-		if (ret < 0) {
+		else if (ret < 0)
 			return -errno;
-		}
+
 		received += ret;
 	}
 
