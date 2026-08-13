@@ -67,7 +67,8 @@ static int conn_count(void)
 {
 	int count = 0;
 	for (int i = 0; i < ARRAY_SIZE(conn_slots); i++) {
-		if (conn_slots[i].conn) count++;
+		if (conn_slots[i].conn)
+			count++;
 	}
 	return count;
 }
@@ -302,7 +303,8 @@ void on_security_changed(struct bt_conn *conn,
 			bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), true);
 		}
 		struct conn_slot *slot = conn_slot_find(conn);
-		if (slot) idle_timer_reset(slot);
+		if (slot)
+			idle_timer_reset(slot);
 	} else {
 		LOG_INF("Security failed: %s level %u err %d\n", addr, level, err);
 		bt_ctrl_msg_send_pairing_result(bt_conn_get_dst(conn), false);
@@ -416,7 +418,8 @@ static ssize_t write_left_door(struct bt_conn *conn,
 	bt_conn_get_info(conn, &info);
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_LEFT_GARAGE_DOOR, info.le.dst);
 	struct conn_slot *slot = conn_slot_find(conn);
-	if (slot) idle_timer_reset(slot);
+	if (slot)
+		idle_timer_reset(slot);
 	return len;
 }
 
@@ -453,7 +456,8 @@ static ssize_t write_right_door(struct bt_conn *conn,
 	bt_conn_get_info(conn, &info);
 	device_control_send_cmd(DEVICE_CTRL_CMD_OPEN_RIGHT_GARAGE_DOOR, info.le.dst);
 	struct conn_slot *lslot = conn_slot_find(conn);
-	if (lslot) idle_timer_reset(lslot);
+	if (lslot)
+		idle_timer_reset(lslot);
 	return len;
 }
 

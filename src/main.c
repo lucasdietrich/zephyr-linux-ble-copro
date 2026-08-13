@@ -13,7 +13,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
-
 #include <zephyr/usb/usb_device.h>
 
 #include <ble_observer.h>
